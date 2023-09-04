@@ -1,0 +1,57 @@
+[
+  {
+    "image": "12+.png",
+    "threshold": "0.8",
+    "taps": "960,800"
+  },
+  {
+    "image": "login.png",
+    "threshold": "0.97",
+    "taps": "1180,850"
+  },
+  {
+    "image": "login2.png",
+    "threshold": "0.9",
+    "taps": "exit"
+  },
+  {
+    "image": "wakeup.png",
+    "threshold": "0.95",
+    "taps": "960,750;1180,850;exit"
+  },
+  {
+    "image": "logout1.png",
+    "threshold": "0.8",
+    "taps": "200,750;1345,745;1180,730"
+  },
+  {
+    "image": "main.png",
+    "threshold": "0.8",
+    "taps": "74,64"
+  },
+  {
+    "image": "battle.png",
+    "threshold": "0.9",
+    "taps": "122,80;1134,507;1320,750"
+  },
+  {
+    "image": "main2.png",
+    "threshold": "0.9",
+    "taps": "1386,1039"
+  },
+  {
+    "image": "exitbattle1.png",
+    "threshold": "0.9",
+    "taps": "1425,870"
+  },
+  {
+    "image": "back.png",
+    "threshold": "0.9",
+    "taps": "765,732"
+  },
+  {
+    "image": "exitsami.png",
+    "threshold": "0.9",
+    "taps": "845,540;960,980"
+  }
+]
