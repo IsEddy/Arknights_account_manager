@@ -1,4 +1,5 @@
-from PyQt5.QtWidgets import QFormLayout, QDialog, QLineEdit, QTimeEdit, QApplication, QCheckBox, QPushButton, QMessageBox, QComboBox, QPlainTextEdit, QHBoxLayout
+from PyQt5.QtWidgets import QFormLayout, QDialog, QLineEdit, QTimeEdit, QApplication, QCheckBox, QPushButton, \
+    QMessageBox, QComboBox, QPlainTextEdit, QHBoxLayout
 from PyQt5.QtCore import QTimer, Qt, QDateTime, QThread, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QIcon, QFont, QDoubleValidator
 from datetime import datetime, timedelta
@@ -22,7 +23,8 @@ from asst.skyland import *  # 森空岛签到，by xxyz30
 
 if not os.path.exists('debug'):
     os.makedirs('debug')
-logging.basicConfig(filename='./debug/debug.log', level=logging.DEBUG, format='[%(asctime)s] - %(name)s - %(levelname)s: %(message)s')
+logging.basicConfig(filename='./debug/debug.log', level=logging.DEBUG,
+                    format='[%(asctime)s] - %(name)s - %(levelname)s: %(message)s')
 logger = logging.getLogger('main')
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)  # 设置控制台处理器的级别
@@ -33,7 +35,7 @@ group_count = 1
 theme = 'light'
 app_name = '斯卡蒂账号小助手'  # 程序名
 sim_name = 'ld'  # 什么模拟器
-sleeptime = 30  # 多少s检测一次时间
+sleeptime = 60  # 多少s检测一次时间
 rogue_name = 'Sami'
 adb_path = ''
 adb_port = ''
@@ -65,108 +67,160 @@ class PrintOutput(QPlainTextEdit):  # print重写
             self.setTextCursor(cursor)
             self.ensureCursorVisible()
 
-'''没有用的多线程，以后可能会加入，也可能不会（
+
+# 没有用的多线程，以后可能会加入，也可能不会（
 class TimerThread(QThread):  # 没有用的多线程
     timer_signal = pyqtSignal(str)
 
-    def __init__(self, account, password, if_rogue):
+    def __init__(self, account, password, if_rogue: bool, group):
         super().__init__()
         self.is_running = True
         self.account = account
         self.password = password
         self.if_rogue = if_rogue
+        self.group = group
 
     def run(self):  # 换号主函数
-        global adb_path, sleeptime, sim_name
+        dialog = InputDialog()
+        global adb_path, tapdelay, sim_name, adb_port, pre_input, path
         account = self.account
         password = self.password
         if_rogue = self.if_rogue
+        group = self.group
+        # 终止MAA
+        print("尝试终止MAA ...")
+        logger.debug("Killing MAA...")
+        popen = os.popen('wmic process where name="maa.exe" call terminate 2>&1').read()
+        logger.debug(popen)
+
         try:
             asst.stop()
         except:
             pass
-        t = 0.5
+        if dialog.rogue_timer.isActive():
+            dialog.rogue_timer.stop()
+        tapdelay = float(dialog.tapdelay.text())
+        t = tapdelay
         i = None
-        pre_input = ''
+        logger.debug("Connecting simulator...")
+        print("正在接模拟器")
         if sim_name == 'ld':
-            run_command(adb_path + ' connect 127.0.0.1:5555')
-            pre_input = ''.join([adb_path + ' -s emulator-5554 shell '])
+            run_command(adb_path + ' connect ' + adb_port)
+        elif sim_name == 'nox':
+            run_command(adb_path + ' connect ' + adb_port)
         elif sim_name == 'mumu':
-            pass
-        elif sim_name == 'mumu':
-            pass
+            run_command(adb_path + ' connect ' + adb_port)
         elif sim_name == 'mumu12':
-            pass
+            run_command(adb_path + ' connect ' + adb_port)
         elif sim_name == 'bluestacks':
-            pass
+            logger.debug(adb_path + ' connect ' + adb_port)
+            run_command(adb_path + ' connect ' + adb_port)
+            run_command(pre_input + 'input su')
         elif sim_name == 'default':
-            pre_input = ''.join([adb_path + ' shell '])
+            run_command(adb_path + ' connect ' + adb_port)
+        print("成功连接至", dialog.sim_name.currentText())
+        run_command(pre_input + 'am force-stop com.zdanjian.zdanjian')  # 关闭自动精灵
         size = os.popen(pre_input + 'wm size').read()
         size = size[size.find(":") + 2:]
         size_x = int(size[:  size.find("x")])
         size_y = int(size[size.find("x") + 1:])
-        print('当前分辨率：', size_x, size_y)
-        while i != '位于登录页':
-            time.sleep(1)
-            i = self.capture_screen()
-            print('识别  ', i)
-            if i == '位于开始页':
-                self.tap_point(pre_input, 960, 800, size_x, size_y)  # 戳一下
-                time.sleep(t)
-            elif i == '点一下账号管理':
-                self.tap_point(pre_input, 1375, 1020, size_x, size_y)
-            elif i == '点一下登陆其他账号':
-                self.tap_point(pre_input, 960, 750, size_x, size_y)
-            elif i == '退出1':
-                self.tap_point(pre_input, 200, 750, size_x, size_y)  # 退出
-                time.sleep(t)
-                self.tap_point(pre_input, 1345, 745, size_x, size_y)
-                time.sleep(t)
-                self.tap_point(pre_input, 1180, 730, size_x, size_y)
-            elif i == '在主菜单':
-                self.tap_point(pre_input, 74, 64, size_x, size_y)
-            elif i == '战斗中':
-                self.tap_point(pre_input, 120, 80, size_x, size_y)
-            elif i == '退出战斗':
-                self.tap_point(pre_input, 1134, 507, size_x, size_y)
-                time.sleep(t)
-                self.tap_point(pre_input, 1320, 750, size_x, size_y)
-            elif i == '退出萨米':
-                self.tap_point(pre_input, 1845, 540, size_x, size_y)
-                time.sleep(2)
-                self.tap_point(pre_input, 960, 980, size_x, size_y)
-            elif i == '位于登录页':
-                break
-            else:
-                self.tap_point(pre_input, 1, 5, size_x, size_y)  # 1！5！
+        print('当前分辨率：' + ''.join([str(size_x), "x", str(size_y)]))
+        logger.debug('Current resolution：' + ''.join([str(size_x), "x", str(size_y)]))
+        print(f"开始切换至账号 {account}")
+        logger.debug(f"Start switching to account {account}...")
+        with open("./recognition_dataset/recg.json", "r") as f:
+            data = json.load(f)
+            f.close()
+        while True:
+            logger.debug("Executing image recognition...")
+            img = dialog.capture_screen()
+            found_match = False  # 布尔变量，用于跟踪是否已经有一次判断成立
+            begin_login = False  # 布尔变量，用于跟踪是否开始登录
+            for images in data:
+                if img is None:
+                    break
+                template = cv2.imread('./recognition_dataset/' + images["image"])
+                # template = cv2.resize(template, (size_x, size_y))
+                result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
+                if result.max() > float(images["threshold"]):
+                    logger.debug("In threshold: " + images["threshold"])
+                    logger.debug(images["image"] + " matched")
+                    found_match = True
+                    taps = images["taps"].split(";")  # 点击的坐标使用分号分隔开
+                    for point in taps:
+                        if point == "exit":  # 坐标支持特殊项：exit，作用为结束识图步骤，开始输入账号密码
+                            begin_login = True
+                        else:
+                            tap_point(pre_input, int(point.split(",")[0]), int(point.split(",")[1]),
+                                             size_x, size_y)
+                            time.sleep(t)
+                    break
+                # else:
+                #     logger.debug("In threshold: " + images["threshold"])
+                #     logger.debug(images["image"] + " Not matched")
+            if not found_match:
+                # 没找到就返回
+                tap_point(pre_input, 1, 5, size_x, size_y)  # 1！5！
                 run_command(pre_input + 'input keyevent BACK')  # 返回
-                time.sleep(2)
-            time.sleep(1)
+                logger.debug("No match found")
+                logger.debug("Adb execute back.")
+                time.sleep(t)
+            if begin_login:
+                logger.debug("Start to input account and password.")
+                break
 
-        self.tap_point(pre_input, 1175, 845, size_x, size_y)  # 跳转至密码登录
-        time.sleep(t)
-        self.tap_point(pre_input, 900, 415, size_x, size_y)  # 输入账号
+        tap_point(pre_input, 900, 415, size_x, size_y)  # 输入账号
         time.sleep(t)
         run_command(pre_input + 'input text ' + account)
         time.sleep(t)
-        self.tap_point(pre_input, 900, 540, size_x, size_y)  # 输入密码
+        tap_point(pre_input, 900, 540, size_x, size_y)  # 输入密码
         time.sleep(t)
         run_command(pre_input + 'input text ' + password)
         time.sleep(t)
-        self.tap_point(pre_input, 705, 620, size_x, size_y)
+        tap_point(pre_input, 705, 620, size_x, size_y)
         time.sleep(t)
-        self.tap_point(pre_input, 960, 750, size_x, size_y)
+        tap_point(pre_input, 960, 750, size_x, size_y)
         time.sleep(t)
+        # 终止adb
+        logger.debug("Disconnecting adb...")  # 似乎不终止adb更好?  # 不对还是终止了好
         run_command(adb_path + ' disconnect')
-        run_command('taskkill /pid adb.exe /f')
-        if if_rogue:
-            self.rogue_timer = QTimer(self)
-            self.rogue_timer.timeout.connect(lambda: InputDialog.start_rogue())
-            self.rogue_timer.start(5 * 2 * 1000)  # 5min检测一次MAA是否在运行
+        print("尝试终止adb ...")
+        popen = os.popen('taskkill /pid adb.exe /f 2>&1').read()
+        print(popen)
+        if popen[:2] == "错误":
+            print("终止adb失败，用管理员方式打开试试？")
+            logger.debug("Disconnect adb failed")
+        else:
+            logger.debug("Disconnect adb succeeded")
+        run_command('wmic process where name="RuntimeBroker.exe" call terminate 2>&1')
+        # 启动MAA
+        time.sleep(5)
+        print("正在启动MAA")
+        with open(''.join(str(path) + '\config\gui.json'), 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            if ''.join(['account', str(group)]) in data['Configurations']:
+                logger.debug("Custom config found!")
+                command = ''.join(
+                    [str(pathlib.Path(__file__).parent.parent), r"\maa.exe --config ", 'account', str(group)])
+                logger.debug("Start MAA in config account" + str(group))
+            elif ''.join(['main', str(group)]) in data['Configurations']:
+                command = ''.join([str(pathlib.Path(__file__).parent.parent), r"\maa.exe --config main"])
+                logger.debug("Start MAA in config main")
+            else:
+                command = ''.join([str(pathlib.Path(__file__).parent.parent), r"\maa.exe"])
+                logger.debug("Start MAA in Default config")
+            subprocess.Popen(command)
+            f.close()
+
+        if if_rogue and dialog.rogue_timer.isActive() is False:  # 开启肉鸽定时器
+            logger.debug("Start Rogue timer!")
+            dialog.rogue_timer.start(5 * 60 * 1000)  # 5min检测一次MAA是否在运行
+        logger.debug("Task Complete")
+
 
     def stop(self):
         self.is_running = False
-'''
+
 
 def get_process_path(process_name):  # 获取进程的绝对位置
     global sim_name
@@ -191,12 +245,22 @@ def get_process_path(process_name):  # 获取进程的绝对位置
         path1 = ''.join(['"', path1, '"'])
         return path1
 
+
+def tap_point(pre_input, x, y, size_x, size_y):
+    x = str(int((x / 1920) * size_x))
+    y = str(int((y / 1080) * size_y))
+    run_command(pre_input + 'input tap ' + x + " " + y)
+    logger.debug("Tap " + x + " " + y)
+    return None
+
+
 def run_command(commands):
     subprocess.Popen(commands, shell=True)  # 用于无终端执行代码
 
+
 class InputDialog(QDialog):
 
-    def capture_screen(self, img = None):  # 截图函数，返回模拟器状态
+    def capture_screen(self, img=None):  # 截图函数，返回模拟器状态
         global adb_path, sim_name, adb_port
         dump_path = ''.join([str(pathlib.Path(__file__).parent), r'\recognition_dataset'])
         logger.debug("Delete image cache")
@@ -205,13 +269,13 @@ class InputDialog(QDialog):
             pre_input + "rm /sdcard/ss.png")
         logger.debug("Capture image")
         run_command(
-                pre_input + "screencap -p /sdcard/ss.png")
+            pre_input + "screencap -p /sdcard/ss.png")
         time.sleep(1)  # adb: error:
         logger.debug("Pulling image to dump path")
         while True:
             if sim_name == 'ld':
                 popen = os.popen(
-                    adb_path + " -s emulator-5554  pull /sdcard/ss.png " + dump_path).read()
+                    adb_path + " -s emulator-5554 pull /sdcard/ss.png " + dump_path).read()
             elif sim_name == 'nox':
                 popen = os.popen(
                     adb_path + " pull /sdcard/ss.png " + dump_path).read()
@@ -249,15 +313,6 @@ class InputDialog(QDialog):
         # result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
         # if result.max() > 0.8:
         #     return '位于开始页'
-
-
-    def tap_point(self, pre_input, x, y, size_x, size_y):
-        x = str(int((x / 1920) * size_x))
-        y = str(int((y / 1080) *size_y))
-        run_command(pre_input + 'input tap ' + x + " " + y)
-        logger.debug("Tap " + x + " " + y)
-        return None
-
 
     def __init__(self):
         global app_name, adb_path
@@ -323,6 +378,8 @@ class InputDialog(QDialog):
         self.sign_timer.timeout.connect(lambda: self.skyland_sign())
         self.sign_timer.start(40 * 1000)  # 60s判定一次
 
+        self.rogue_timer = QTimer(self)
+        self.account_timer = QTimer(self)
 
     def redirect_print_to_widget(self):
         sys.stdout = self.output_text_edit
@@ -377,8 +434,8 @@ class InputDialog(QDialog):
         logger.debug(f"Set adb port: {adb_port}")
         logger.debug(f"Using pre input: {pre_input}")
 
-        print('设置模拟器为：', self.sim_name.currentText(),'\n'
-              'Adb路径：', adb_path)
+        print('设置模拟器为：', self.sim_name.currentText(), '\n'
+                                                      'Adb路径：', adb_path)
 
     def deeebuuuggg(self):
         global sleeptime, if_debug
@@ -401,7 +458,7 @@ class InputDialog(QDialog):
         global group_count
         account_edit = QLineEdit(self)  # 创建账号输入框
         password_edit = QLineEdit(self)
-        password_edit.setEchoMode(QLineEdit.Password)# 创建密码输入框
+        password_edit.setEchoMode(QLineEdit.Password)  # 创建密码输入框
         time_edit = QTimeEdit(self)  # 创建时间输入框
         time_edit.setDisplayFormat('HH:mm')
         time_edit.setCalendarPopup(True)
@@ -542,7 +599,8 @@ class InputDialog(QDialog):
                     switch.clicked.connect(self.switch_btn_command)
                     switch.setChecked(account_switch)
 
-                    input_group = (account_edit, password_edit, time_edit, if_rogue, rogue_name, switch)  # 将一组输入框打包为一个元组
+                    input_group = (
+                        account_edit, password_edit, time_edit, if_rogue, rogue_name, switch)  # 将一组输入框打包为一个元组
                     self.inputs.append(input_group)  # 将一组输入框添加到列表中
                     group_count += 1
 
@@ -592,7 +650,8 @@ class InputDialog(QDialog):
             if_rogue = if_rogue.isChecked()
             rogue_name = rogue_name.currentIndex()
             account_switch = switch.isChecked()
-            group_data = {"group": group_count, "account": account, "password": password, "time": time, "if_rogue": if_rogue, "rogue_name": rogue_name, "switch": account_switch}  # 将一组数据打包为一个字典对象
+            group_data = {"group": group_count, "account": account, "password": password, "time": time,
+                          "if_rogue": if_rogue, "rogue_name": rogue_name, "switch": account_switch}  # 将一组数据打包为一个字典对象
             data.append(group_data)  # 将一组数据添加到列表中
 
         with open("info.txt", "w") as f:
@@ -651,20 +710,20 @@ class InputDialog(QDialog):
                     elif rogue_name == 2:
                         rogue_name = "Phantom"
                     times[time] = [account, password, rogue, rogue_name, i]
-                    print(f'第{i}组账号：', account,'\n'
-                          '执行时间：',  time,'\n'
-                          '是否肉鸽：', rogue,'\n'
-                          '打哪个（如果打）：', rogue_name)
+                    print(f'第{i}组账号：', account, '\n'
+                            '执行时间：', time, '\n'
+                            '是否肉鸽：', rogue, '\n'
+                            '打哪个（如果打）：', rogue_name)
 
         # self.account_timer_thread = TimerThread(times)
         # self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
         # self.account_timer_thread.start()
         # self.account_timer_thread = TimerThread(times)
+        self.rogue_timer = QTimer(self)
         self.account_timer = QTimer(self)
+
         self.account_timer.timeout.connect(lambda: self.execute_command(times))
         self.account_timer.start(sleeptime * 1000)
-
-        self.rogue_timer = QTimer(self)
         self.rogue_timer.timeout.connect(lambda: self.start_rogue())
 
     @pyqtSlot(str)  # 子线程输出
@@ -672,9 +731,7 @@ class InputDialog(QDialog):
         self.output_text_edit.appendPlainText(text)
 
     def stop_command(self):  # 停止按钮
-        logger.debug("All timer stop!")
         global app_name
-        print('停止了所有进行的任务！')
         # self.account_timer = None
         # self.rogue_timer = None
         self.save_info()
@@ -688,6 +745,9 @@ class InputDialog(QDialog):
             logger.debug("MAA Core stop!")
         except:
             pass
+
+        print('停止了所有进行的任务！')
+        logger.debug("All timer stop!")
 
     def change_command(self):
         global theme
@@ -727,10 +787,13 @@ class InputDialog(QDialog):
             # print(t1, t2)
             if current_time == t1 or current_time == t2:
                 rogue_name = times.get(m)[3]
-                # self.account_timer_thread = TimerThread(times.get(m)[0], times.get(m)[1], times.get(m)[2])
-                # self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
-                # self.account_timer_thread.start()
-                self.execute_adb_command(times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4])
+                self.account_timer_thread = TimerThread(
+                    times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4]
+                )
+                self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
+                self.account_timer_thread.start()
+                time.sleep(2)
+                # TimerThread.run(times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4])
         if current_time == '03:55':
             logger.debug("Restarting game...")
             print('临近数据更新时间，重启游戏')
@@ -761,137 +824,6 @@ class InputDialog(QDialog):
             run_command(pre_input + 'monkey -p com.hypergryph.arknights -c android.intent.category.LAUNCHER 1')  # 打开!方舟
             run_command(adb_path + ' disconnect')
             logger.debug("Restart complete!")
-
-    def execute_adb_command(self, account, password, if_rogue: bool, group):  # 换号主函数
-        global adb_path, tapdelay, sim_name, adb_port, pre_input
-        '''终止MAA'''
-        print("尝试终止MAA ...")
-        logger.debug("Killing MAA...")
-        popen = os.popen('wmic process where name="maa.exe" call terminate 2>&1').read()
-        logger.debug(popen)
-
-        try:
-            asst.stop()
-        except:
-            pass
-        if self.rogue_timer.isActive():
-            self.rogue_timer.stop()
-        tapdelay = float(self.tapdelay.text())
-        t = tapdelay
-        i = None
-        logger.debug("Connecting simulator...")
-        print("正在接模拟器")
-        if sim_name == 'ld':
-            run_command(adb_path + ' connect ' + adb_port)
-        elif sim_name == 'nox':
-            run_command(adb_path + ' connect ' + adb_port)
-        elif sim_name == 'mumu':
-            run_command(adb_path + ' connect ' + adb_port)
-        elif sim_name == 'mumu12':
-            run_command(adb_path + ' connect ' + adb_port)
-        elif sim_name == 'bluestacks':
-            logger.debug(adb_path + ' connect ' + adb_port)
-            run_command(adb_path + ' connect ' + adb_port)
-            run_command(pre_input + 'input su')
-        elif sim_name == 'default':
-            run_command(adb_path + ' connect ' + adb_port)
-        print("成功连接至", self.sim_name.currentText())
-        run_command(pre_input + 'am force-stop com.zdanjian.zdanjian')  # 关闭自动精灵
-        size = os.popen(pre_input + 'wm size').read()
-        size = size[size.find(":") + 2:]
-        size_x = int(size[:  size.find("x")])
-        size_y = int(size[size.find("x") + 1:])
-        print('当前分辨率：' + ''.join([str(size_x), "x", str(size_y)]))
-        logger.debug('Current resolution：' + ''.join([str(size_x), "x", str(size_y)]))
-        print(f"开始切换至账号 {account}")
-        logger.debug(f"Start switching to account {account}...")
-        with open("./recognition_dataset/recg.json", "r") as f:
-            data = json.load(f)
-            f.close()
-        while True:
-            logger.debug("Executing image recognition...")
-            img = self.capture_screen()
-            found_match = False  # 布尔变量，用于跟踪是否已经有一次判断成立
-            begin_login = False  # 布尔变量，用于跟踪是否开始登录
-            for images in data:
-                if img is None:
-                    break
-                template = cv2.imread('./recognition_dataset/' + images["image"])
-                # template = cv2.resize(template, (size_x, size_y))
-                result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
-                if result.max() > float(images["threshold"]):
-                    logger.debug("In threshold: " + images["threshold"])
-                    logger.debug(images["image"] + " matched")
-                    found_match = True
-                    taps = images["taps"].split(";")  # 点击的坐标使用分号分隔开
-                    for point in taps:
-                        if point == "exit":  # 坐标支持特殊项：exit，作用为结束识图步骤，开始输入账号密码
-                            begin_login = True
-                        else:
-                            self.tap_point(pre_input, int(point.split(",")[0]), int(point.split(",")[1]), size_x, size_y)
-                            time.sleep(t)
-                    break
-                # else:
-                #     logger.debug("In threshold: " + images["threshold"])
-                #     logger.debug(images["image"] + " Not matched")
-            if not found_match:
-                # 没找到就返回
-                self.tap_point(pre_input, 1, 5, size_x, size_y)  # 1！5！
-                run_command(pre_input + 'input keyevent BACK')  # 返回
-                logger.debug("No match found")
-                logger.debug("Adb execute back.")
-                time.sleep(t)
-            if begin_login:
-                logger.debug("Start to input account and password.")
-                break
-
-        self.tap_point(pre_input, 900, 415, size_x, size_y)  # 输入账号
-        time.sleep(t)
-        run_command(pre_input + 'input text ' + account)
-        time.sleep(t)
-        self.tap_point(pre_input, 900, 540, size_x, size_y)  # 输入密码
-        time.sleep(t)
-        run_command(pre_input + 'input text ' + password)
-        time.sleep(t)
-        self.tap_point(pre_input, 705, 620, size_x,size_y)
-        time.sleep(t)
-        self.tap_point(pre_input, 960, 750, size_x,size_y)
-        time.sleep(t)
-        ''' 终止adb '''
-        logger.debug("Disconnecting adb...")  # 似乎不终止adb更好?  # 不对还是终止了好
-        run_command(adb_path + ' disconnect')
-        print("尝试终止adb ...")
-        popen = os.popen('taskkill /pid adb.exe /f 2>&1').read()
-        print(popen)
-        if popen[:2] == "错误":
-            print("终止adb失败，用管理员方式打开试试？")
-            logger.debug("Disconnect adb failed")
-        else:
-            logger.debug("Disconnect adb succeeded")
-        run_command('wmic process where name="RuntimeBroker.exe" call terminate 2>&1')
-
-        ''' 启动MAA '''
-        time.sleep(5)
-        print("正在启动MAA")
-        with open(''.join(str(path) + '\config\gui.json'), 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            if ''.join(['account', str(group)]) in data['Configurations']:
-                logger.debug("Custom config found!")
-                command = ''.join([str(pathlib.Path(__file__).parent.parent), r"\maa.exe --config ", 'account', str(group)])
-                logger.debug("Start MAA in config account" + str(group))
-            elif ''.join(['main', str(group)]) in data['Configurations']:
-                command = ''.join([str(pathlib.Path(__file__).parent.parent), r"\maa.exe --config main"])
-                logger.debug("Start MAA in config main")
-            else:
-                command = ''.join([str(pathlib.Path(__file__).parent.parent), r"\maa.exe"])
-                logger.debug("Start MAA in Default config")
-            subprocess.Popen(command)
-            f.close()
-
-        if if_rogue and self.rogue_timer.isActive() is False:  # 开启肉鸽定时器
-            logger.debug("Start Rogue timer!")
-            self.rogue_timer.start(5 * 60 * 1000)  # 5min检测一次MAA是否在运行
-        logger.debug("Task Complete")
 
     # def getInputs(self):
     #     return [input_group[0].text() for input_group in self.inputs]
@@ -976,5 +908,3 @@ if __name__ == '__main__':
     # adb_path = get_process_path('dnplayer.exe')
     # print('当前Adb路径为：', adb_path)
     sys.exit(app.exec_())
-
-
