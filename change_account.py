@@ -68,8 +68,7 @@ class PrintOutput(QPlainTextEdit):  # print重写
             self.ensureCursorVisible()
 
 
-# 没有用的多线程，以后可能会加入，也可能不会（
-class TimerThread(QThread):  # 没有用的多线程
+class TimerThread(QThread):  # 多线程，用于账号切换
     timer_signal = pyqtSignal(str)
 
     def __init__(self, account, password, if_rogue: bool, group):
