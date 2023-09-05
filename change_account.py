@@ -866,6 +866,7 @@ class InputDialog(QDialog):
             asst.start()
         else:
             logger.debug("[Rogue Timer]Detected that MAA is running.")
+            print("如果你的MAA没有在运行的话，可以双击一下文件夹内的MaaIsOff.bat")  # 我实在是想不出有什么好的检测maa是否在运行的方法了
 
 
 if __name__ == '__main__':
