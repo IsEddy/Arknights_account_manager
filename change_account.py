@@ -104,22 +104,13 @@ class TimerThread(QThread):  # 没有用的多线程
         i = None
         logger.debug("Connecting simulator...")
         print("正在接模拟器")
-        if sim_name == 'ld':
-            run_command(adb_path + ' connect ' + adb_port)
-        elif sim_name == 'nox':
-            run_command(adb_path + ' connect ' + adb_port)
-        elif sim_name == 'mumu':
-            run_command(adb_path + ' connect ' + adb_port)
-        elif sim_name == 'mumu12':
-            run_command(adb_path + ' connect ' + adb_port)
-        elif sim_name == 'bluestacks':
-            logger.debug(adb_path + ' connect ' + adb_port)
+        if sim_name == 'bluestacks':
             run_command(adb_path + ' connect ' + adb_port)
             run_command(pre_input + 'input su')
-        elif sim_name == 'default':
+        else:
             run_command(adb_path + ' connect ' + adb_port)
         print("成功连接至", dialog.sim_name.currentText())
-        run_command(pre_input + 'am force-stop com.zdanjian.zdanjian')  # 关闭自动精灵
+        run_command(pre_input + 'am force-stop com.zdanjian.zdanjian')  # 关闭自动精灵(你可以用自动精灵，不会出事)
         size = os.popen(pre_input + 'wm size').read()
         size = size[size.find(":") + 2:]
         size_x = int(size[:  size.find("x")])
@@ -134,8 +125,8 @@ class TimerThread(QThread):  # 没有用的多线程
         while True:
             logger.debug("Executing image recognition...")
             img = dialog.capture_screen()
-            found_match = False  # 布尔变量，用于跟踪是否已经有一次判断成立
-            begin_login = False  # 布尔变量，用于跟踪是否开始登录
+            found_match = False  # 用于跟踪是否已经有一次判断成立
+            begin_login = False  # 用于跟踪是否开始登录
             for images in data:
                 if img is None:
                     break
@@ -759,6 +750,7 @@ class InputDialog(QDialog):
             theme = 'light'
 
     def skyland_sign(self):  # 签到定时器
+        global adb_path, adb_port, pre_input
         with open("info.txt", "r") as f:
             times = {}  # 创建一个空字典，用于存放时间和对应的数据
             data = json.load(f)  # 加载json格式的数据为字典对象
@@ -777,6 +769,30 @@ class InputDialog(QDialog):
                 cred = get_cred_by_token(token)
                 print(do_sign(cred))
 
+        if current_time == '03:55':
+            logger.debug("Restarting game...")
+            print('临近数据更新时间，重启游戏')
+            try:
+                asst.stop()
+                logger.debug("MAA Core stop!")
+            except:
+                pass
+            logger.debug("Connecting simulator...")
+            if sim_name == 'bluestacks':
+                run_command(adb_path + ' connect ' + adb_port)
+                run_command(pre_input + 'input su')
+            else:
+                run_command(adb_path + ' connect ' + adb_port)
+            time.sleep(2)
+            logger.debug("Shutting down Arknights...")
+            run_command(pre_input + 'am force-stop com.hypergryph.arknights')  # 关掉!方舟
+            time.sleep(2)
+            logger.debug("Starting Arknights...")
+            run_command(pre_input + 'monkey -p com.hypergryph.arknights -c android.intent.category.LAUNCHER 1')  # 打开!方舟
+            time.sleep(2)
+            run_command(adb_path + ' disconnect')
+            logger.debug("Restart complete!")
+
     def execute_command(self, times):  # 换号定时器
         global rogue_name, pre_input
         current_time = time.strftime('%H:%M')
@@ -794,36 +810,6 @@ class InputDialog(QDialog):
                 self.account_timer_thread.start()
                 time.sleep(2)
                 # TimerThread.run(times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4])
-        if current_time == '03:55':
-            logger.debug("Restarting game...")
-            print('临近数据更新时间，重启游戏')
-            try:
-                asst.stop()
-                logger.debug("MAA Core stop!")
-            except:
-                pass
-            logger.debug("Connecting simulator...")
-            if sim_name == 'ld':
-                run_command(adb_path + ' connect ' + adb_port)
-            elif sim_name == 'nox':
-                run_command(adb_path + ' connect ' + adb_port)
-            elif sim_name == 'mumu':
-                run_command(adb_path + ' connect ' + adb_port)
-            elif sim_name == 'mumu12':
-                run_command(adb_path + ' connect ' + adb_port)
-            elif sim_name == 'bluestacks':
-                run_command(adb_path + ' connect ' + adb_port)
-                run_command(pre_input + 'input su')
-            elif sim_name == 'default':
-                run_command(adb_path + ' connect ' + adb_port)
-            time.sleep(2)
-            logger.debug("Shutting down Arknights...")
-            run_command(pre_input + 'am force-stop com.hypergryph.arknights')  # 关掉!方舟
-            time.sleep(2)
-            logger.debug("Starting Arknights...")
-            run_command(pre_input + 'monkey -p com.hypergryph.arknights -c android.intent.category.LAUNCHER 1')  # 打开!方舟
-            run_command(adb_path + ' disconnect')
-            logger.debug("Restart complete!")
 
     # def getInputs(self):
     #     return [input_group[0].text() for input_group in self.inputs]
