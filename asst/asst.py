@@ -33,8 +33,6 @@ class Asst:
             ``user_dir``:   用户数据（日志、调试图片等）写入文件夹路径
         """
 
-
-
         platform_values = {
             'windows': {
                 'libpath': 'MaaCore.dll',
@@ -75,12 +73,7 @@ class Asst:
         if user_dir:
             ret &= Asst.__lib.AsstSetUserDir(str(user_dir).encode('utf-8'))
 
-        try:
-            ret_value = Asst.__lib.AsstLoadResource(str(path).encode('utf-8'))
-            ret &= ret_value
-        except Exception as e:
-            print("An error occurred while loading resources:", e)
-
+        ret &= Asst.__lib.AsstLoadResource(str(path).encode('utf-8'))
         if incremental_path:
             ret &= Asst.__lib.AsstLoadResource(
                 str(incremental_path).encode('utf-8'))
@@ -251,4 +244,3 @@ class Asst:
         Asst.__lib.AsstLog.restype = None
         Asst.__lib.AsstLog.argtypes = (
             ctypes.c_char_p, ctypes.c_char_p)
-

@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QFormLayout, QDialog, QLineEdit, QTimeEdit, QApplication, QCheckBox, QPushButton, \
     QMessageBox, QComboBox, QPlainTextEdit, QHBoxLayout
-from PyQt5.QtCore import QTimer, Qt, QDateTime, QThread, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import QTimer, Qt, QDateTime, QThread, pyqtSignal, pyqtSlot, QMetaObject
 from PyQt5.QtGui import QIcon, QFont, QDoubleValidator
 from datetime import datetime, timedelta
 import sys
@@ -43,6 +43,7 @@ pre_input = ''
 tapdelay = 3
 if_debug = False
 version = 0.11
+is_running = False
 
 
 class PrintOutput(QPlainTextEdit):  # print重写
@@ -73,13 +74,15 @@ class TimerThread(QThread):  # 多线程，用于账号切换
 
     def __init__(self, account, password, if_rogue: bool, group):
         super().__init__()
-        self.is_running = True
         self.account = account
         self.password = password
         self.if_rogue = if_rogue
         self.group = group
 
     def run(self):  # 换号主函数
+        global is_running
+        is_running = True
+        logger.debug("[Child Thread]Account change thread start!")
         dialog = InputDialog()
         global adb_path, tapdelay, sim_name, adb_port, pre_input, path
         account = self.account
@@ -88,7 +91,7 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         group = self.group
         # 终止MAA
         print("尝试终止MAA ...")
-        logger.debug("Killing MAA...")
+        logger.debug("[Child Thread]Killing MAA...")
         popen = os.popen('wmic process where name="maa.exe" call terminate 2>&1').read()
         logger.debug(popen)
 
@@ -101,7 +104,7 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         tapdelay = float(dialog.tapdelay.text())
         t = tapdelay
         i = None
-        logger.debug("Connecting simulator...")
+        logger.debug("[Child Thread]Connecting simulator...")
         print("正在接模拟器")
         if sim_name == 'bluestacks':
             run_command(adb_path + ' connect ' + adb_port)
@@ -115,14 +118,14 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         size_x = int(size[:  size.find("x")])
         size_y = int(size[size.find("x") + 1:])
         print('当前分辨率：' + ''.join([str(size_x), "x", str(size_y)]))
-        logger.debug('Current resolution：' + ''.join([str(size_x), "x", str(size_y)]))
+        logger.debug('[Child Thread]Current resolution：' + ''.join([str(size_x), "x", str(size_y)]))
         print(f"开始切换至账号 {account}")
-        logger.debug(f"Start switching to account {account}...")
+        logger.debug(f"[Child Thread]Start switching to account {account}...")
         with open("./recognition_dataset/recg.json", "r") as f:
             data = json.load(f)
             f.close()
         while True:
-            logger.debug("Executing image recognition...")
+            logger.debug("[Child Thread]Executing image recognition...")
             img = dialog.capture_screen()
             found_match = False  # 用于跟踪是否已经有一次判断成立
             begin_login = False  # 用于跟踪是否开始登录
@@ -133,8 +136,8 @@ class TimerThread(QThread):  # 多线程，用于账号切换
                 # template = cv2.resize(template, (size_x, size_y))
                 result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
                 if result.max() > float(images["threshold"]):
-                    logger.debug("In threshold: " + images["threshold"])
-                    logger.debug(images["image"] + " matched")
+                    logger.debug("[Child Thread]In threshold: " + images["threshold"])
+                    logger.debug("[Child Thread]" + images["image"] + " matched")
                     found_match = True
                     taps = images["taps"].split(";")  # 点击的坐标使用分号分隔开
                     for point in taps:
@@ -152,11 +155,11 @@ class TimerThread(QThread):  # 多线程，用于账号切换
                 # 没找到就返回
                 tap_point(pre_input, 1, 5, size_x, size_y)  # 1！5！
                 run_command(pre_input + 'input keyevent BACK')  # 返回
-                logger.debug("No match found")
-                logger.debug("Adb execute back.")
+                logger.debug("[Child Thread]No match found")
+                logger.debug("[Child Thread]Adb execute back.")
                 time.sleep(t)
             if begin_login:
-                logger.debug("Start to input account and password.")
+                logger.debug("[Child Thread]Start to input account and password.")
                 break
 
         tap_point(pre_input, 900, 415, size_x, size_y)  # 输入账号
@@ -172,16 +175,16 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         tap_point(pre_input, 960, 750, size_x, size_y)
         time.sleep(t)
         # 终止adb
-        logger.debug("Disconnecting adb...")  # 似乎不终止adb更好?  # 不对还是终止了好
+        logger.debug("[Child Thread]Disconnecting adb...")  # 似乎不终止adb更好?  # 不对还是终止了好
         run_command(adb_path + ' disconnect')
         print("尝试终止adb ...")
         popen = os.popen('taskkill /pid adb.exe /f 2>&1').read()
         print(popen)
         if popen[:2] == "错误":
             print("终止adb失败，用管理员方式打开试试？")
-            logger.debug("Disconnect adb failed")
+            logger.debug("[Child Thread]Disconnect adb failed")
         else:
-            logger.debug("Disconnect adb succeeded")
+            logger.debug("[Child Thread]Disconnect adb succeeded")
         run_command('wmic process where name="RuntimeBroker.exe" call terminate 2>&1')
         # 启动MAA
         time.sleep(5)
@@ -189,23 +192,25 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         with open(''.join(str(path) + '\config\gui.json'), 'r', encoding='utf-8') as f:
             data = json.load(f)
             if ''.join(['account', str(group)]) in data['Configurations']:
-                logger.debug("Custom config found!")
+                logger.debug("[Child Thread]Custom config found!")
                 command = ''.join(
                     [str(pathlib.Path(__file__).parent.parent), r"\maa.exe --config ", 'account', str(group)])
-                logger.debug("Start MAA in config account" + str(group))
+                logger.debug("[Child Thread]Start MAA in config account" + str(group))
             elif ''.join(['main', str(group)]) in data['Configurations']:
                 command = ''.join([str(pathlib.Path(__file__).parent.parent), r"\maa.exe --config main"])
-                logger.debug("Start MAA in config main")
+                logger.debug("[Child Thread]Start MAA in config main")
             else:
                 command = ''.join([str(pathlib.Path(__file__).parent.parent), r"\maa.exe"])
-                logger.debug("Start MAA in Default config")
+                logger.debug("[Child Thread]Start MAA in Default config")
             subprocess.Popen(command)
             f.close()
 
         if if_rogue and dialog.rogue_timer.isActive() is False:  # 开启肉鸽定时器
-            logger.debug("Start Rogue timer!")
-            dialog.rogue_timer.start(5 * 60 * 1000)  # 5min检测一次MAA是否在运行
-        logger.debug("Task Complete")
+            logger.debug("[Child Thread]Start Rogue timer!")
+            # 使用invokeMethod在主线程中触发rogue_timer并执行start_rogue槽函数
+            QMetaObject.invokeMethod(dialog.rogue_timer, "start", Qt.QueuedConnection, Qt.QueuedConnection)
+        logger.debug("[Child Thread]Task Complete")
+        is_running = False
 
 
     def stop(self):
@@ -714,7 +719,6 @@ class InputDialog(QDialog):
 
         self.account_timer.timeout.connect(lambda: self.execute_command(times))
         self.account_timer.start(sleeptime * 1000)
-        self.rogue_timer.timeout.connect(lambda: self.start_rogue())
 
     @pyqtSlot(str)  # 子线程输出
     def update_output(self, text):
@@ -793,7 +797,7 @@ class InputDialog(QDialog):
             logger.debug("Restart complete!")
 
     def execute_command(self, times):  # 换号定时器
-        global rogue_name, pre_input
+        global rogue_name, pre_input, is_running
         current_time = time.strftime('%H:%M')
         for m in times:
             t1 = m
@@ -806,7 +810,8 @@ class InputDialog(QDialog):
                     times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4]
                 )
                 self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
-                self.account_timer_thread.start()
+                if is_running is False:
+                    self.account_timer_thread.start()
                 time.sleep(2)
                 # TimerThread.run(times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4])
 
@@ -828,10 +833,10 @@ class InputDialog(QDialog):
             print('此次肉鸽任务为：', rogue_name)
             # 触控方案配置  请务必设置adbinput！！！！！！！！！！！  # 戳啦，都能用啦（
             if asst.set_instance_option(InstanceOptionType.touch_type, 'minitouch'):
-                logger.debug("Adb connection successful!")
+                logger.debug("[Rogue Timer]Adb connection successful!")
                 print('Adb连接成功！')
             else:
-                logger.debug("Adb connection failed, Task stop!")
+                logger.debug("[Rogue Timer]Adb connection failed, Task stop!")
                 print('Adb连接失败，任务终止！')
                 exit()
             try:
