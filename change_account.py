@@ -41,7 +41,7 @@ adb_path = ''
 adb_port = ''
 pre_input = ''
 tapdelay = 3
-if_debug = False
+if_debug = True
 version = 0.11
 is_running = False
 
@@ -99,8 +99,8 @@ class TimerThread(QThread):  # 多线程，用于账号切换
             asst.stop()
         except:
             pass
-        if dialog.rogue_timer.isActive():
-            dialog.rogue_timer.stop()
+        # if dialog.rogue_timer.isActive():
+        #     dialog.rogue_timer.stop()
         tapdelay = float(dialog.tapdelay.text())
         t = tapdelay
         i = None
@@ -185,7 +185,8 @@ class TimerThread(QThread):  # 多线程，用于账号切换
             logger.debug("[Child Thread]Disconnect adb failed")
         else:
             logger.debug("[Child Thread]Disconnect adb succeeded")
-        run_command('wmic process where name="RuntimeBroker.exe" call terminate 2>&1')
+        logger.debug("[Child Thread]Shutting down RuntimeBroker.exe...")
+        run_command('taskkill /pid RuntimeBroker.exe /f')
         # 启动MAA
         time.sleep(5)
         print("正在启动MAA")
@@ -204,11 +205,9 @@ class TimerThread(QThread):  # 多线程，用于账号切换
                 logger.debug("[Child Thread]Start MAA in Default config")
             subprocess.Popen(command)
             f.close()
-
         if if_rogue and dialog.rogue_timer.isActive() is False:  # 开启肉鸽定时器
             logger.debug("[Child Thread]Start Rogue timer!")
-            # 使用invokeMethod在主线程中触发rogue_timer并执行start_rogue槽函数
-            QMetaObject.invokeMethod(dialog.rogue_timer, "start", Qt.QueuedConnection, Qt.QueuedConnection)
+            self.timer_signal.emit()
         logger.debug("[Child Thread]Task Complete")
         is_running = False
 
@@ -371,9 +370,11 @@ class InputDialog(QDialog):
 
         self.sign_timer = QTimer(self)
         self.sign_timer.timeout.connect(lambda: self.skyland_sign())
-        self.sign_timer.start(40 * 1000)  # 60s判定一次
+        self.sign_timer.start(40 * 1000)
 
         self.rogue_timer = QTimer(self)
+        self.rogue_timer.timeout.connect(lambda: self.start_rogue())
+        self.rogue_timer.start(5 * 60 * 1000)
         self.account_timer = QTimer(self)
 
     def redirect_print_to_widget(self):
@@ -714,7 +715,6 @@ class InputDialog(QDialog):
         # self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
         # self.account_timer_thread.start()
         # self.account_timer_thread = TimerThread(times)
-        self.rogue_timer = QTimer(self)
         self.account_timer = QTimer(self)
 
         self.account_timer.timeout.connect(lambda: self.execute_command(times))
@@ -810,6 +810,7 @@ class InputDialog(QDialog):
                     times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4]
                 )
                 self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
+                self.account_timer_thread.timer_signal.connect(self.start_rogue)
                 if is_running is False:
                     self.account_timer_thread.start()
                 time.sleep(2)
@@ -895,6 +896,9 @@ if __name__ == '__main__':
     ss.show()
     ss.redirect_print_to_widget()
     ss.change_adb_path()
+    if if_debug:
+        if_debug = False
+        ss.deeebuuuggg()
     logger.debug("GUI Start!")
     # adb_path = get_process_path('dnplayer.exe')
     # print('当前Adb路径为：', adb_path)
