@@ -41,7 +41,7 @@ adb_path = ''
 adb_port = ''
 pre_input = ''
 tapdelay = 3
-if_debug = True
+if_debug = False
 version = 0.11
 is_running = False
 
