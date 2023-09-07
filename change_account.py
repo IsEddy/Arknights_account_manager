@@ -71,6 +71,7 @@ class PrintOutput(QPlainTextEdit):  # print重写
 
 class TimerThread(QThread):  # 多线程，用于账号切换
     timer_signal = pyqtSignal(str)
+    signal_start_rogue = pyqtSignal()
 
     def __init__(self, account, password, if_rogue: bool, group):
         super().__init__()
@@ -94,7 +95,6 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         logger.debug("[Child Thread]Killing MAA...")
         popen = os.popen('wmic process where name="maa.exe" call terminate 2>&1').read()
         logger.debug(popen)
-
         try:
             asst.stop()
         except:
@@ -107,11 +107,13 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         logger.debug("[Child Thread]Connecting simulator...")
         print("正在接模拟器")
         if sim_name == 'bluestacks':
-            run_command(adb_path + ' connect ' + adb_port)
-            run_command(pre_input + 'input su')
+            subprocess.run(''.join([adb_path + ' connect ' + adb_port]), shell=True)
+            subprocess.run(''.join([pre_input + 'input su']), shell=True)
         else:
-            run_command(adb_path + ' connect ' + adb_port)
+            subprocess.run(''.join([adb_path + ' connect ' + adb_port]), shell=True)
         print("成功连接至", dialog.sim_name.currentText())
+        logger.debug("[Child Thread]Successfully connect to simulator.")
+        time.sleep(2)
         run_command(pre_input + 'am force-stop com.zdanjian.zdanjian')  # 关闭自动精灵(你可以用自动精灵，不会出事)
         size = os.popen(pre_input + 'wm size').read()
         size = size[size.find(":") + 2:]
@@ -175,21 +177,24 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         tap_point(pre_input, 960, 750, size_x, size_y)
         time.sleep(t)
         # 终止adb
-        logger.debug("[Child Thread]Disconnecting adb...")  # 似乎不终止adb更好?  # 不对还是终止了好
+        logger.debug("[Child Thread]Disconnecting adb...")
         run_command(adb_path + ' disconnect')
-        print("尝试终止adb ...")
-        popen = os.popen('taskkill /pid adb.exe /f 2>&1').read()
-        print(popen)
-        if popen[:2] == "错误":
-            print("终止adb失败，用管理员方式打开试试？")
-            logger.debug("[Child Thread]Disconnect adb failed")
-        else:
-            logger.debug("[Child Thread]Disconnect adb succeeded")
+        time.sleep(2)
+        # print("尝试终止adb ...")
+        # logger.debug("[Child Thread]Killing adb.exe...")  # 似乎不终止adb更好?
+        # popen = os.popen('taskkill /pid adb.exe /f 2>&1').read()
+        # print(popen)
+        # if popen[:2] == "错误":
+        #     print("终止adb失败，用管理员方式打开试试？")
+        #     logger.debug("[Child Thread]Disconnect adb failed")
+        # else:
+        #     logger.debug("[Child Thread]Disconnect adb succeeded")
         logger.debug("[Child Thread]Shutting down RuntimeBroker.exe...")
         run_command('taskkill /pid RuntimeBroker.exe /f')
         # 启动MAA
-        time.sleep(5)
+        time.sleep(2)
         print("正在启动MAA")
+        logger.debug("[Child Thread]Starting MAA...")
         with open(''.join(str(path) + '\config\gui.json'), 'r', encoding='utf-8') as f:
             data = json.load(f)
             if ''.join(['account', str(group)]) in data['Configurations']:
@@ -207,7 +212,7 @@ class TimerThread(QThread):  # 多线程，用于账号切换
             f.close()
         if if_rogue and dialog.rogue_timer.isActive() is False:  # 开启肉鸽定时器
             logger.debug("[Child Thread]Start Rogue timer!")
-            self.timer_signal.emit()
+            self.signal_start_rogue.emit()
         logger.debug("[Child Thread]Task Complete")
         is_running = False
 
@@ -373,8 +378,6 @@ class InputDialog(QDialog):
         self.sign_timer.start(40 * 1000)
 
         self.rogue_timer = QTimer(self)
-        self.rogue_timer.timeout.connect(lambda: self.start_rogue())
-        self.rogue_timer.start(5 * 60 * 1000)
         self.account_timer = QTimer(self)
 
     def redirect_print_to_widget(self):
@@ -716,7 +719,6 @@ class InputDialog(QDialog):
         # self.account_timer_thread.start()
         # self.account_timer_thread = TimerThread(times)
         self.account_timer = QTimer(self)
-
         self.account_timer.timeout.connect(lambda: self.execute_command(times))
         self.account_timer.start(sleeptime * 1000)
 
@@ -767,10 +769,14 @@ class InputDialog(QDialog):
         if current_time == '04:01':  # 森空岛登录
             logger.debug("Execute skyland sign.")
             for m in times:
-                logger.debug(f"Sign account:{times.get(m)[0]}")
-                token = login_by_password(times.get(m)[0], times.get(m)[1])
-                cred = get_cred_by_token(token)
-                print(do_sign(cred))
+                try:
+                    logger.debug(f"Sign account:{times.get(m)[0]}")
+                    token = login_by_password(times.get(m)[0], times.get(m)[1])
+                    cred = get_cred_by_token(token)
+                    print(do_sign(cred))
+                except:
+                    print("森空岛签到失败，请检查网络代理")
+                    logger.debug("[Sign Timer]Failed to Sign Skyland, maybe the VPN is on?")
 
         if current_time == '03:55':
             logger.debug("Restarting game...")
@@ -810,7 +816,7 @@ class InputDialog(QDialog):
                     times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4]
                 )
                 self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
-                self.account_timer_thread.timer_signal.connect(self.start_rogue)
+                self.account_timer_thread.signal_start_rogue.connect(self.start_rogue_timer)
                 if is_running is False:
                     self.account_timer_thread.start()
                 time.sleep(2)
@@ -818,6 +824,11 @@ class InputDialog(QDialog):
 
     # def getInputs(self):
     #     return [input_group[0].text() for input_group in self.inputs]
+
+    def start_rogue_timer(self):
+        self.rogue_timer.timeout.connect(lambda: self.start_rogue())
+        self.rogue_timer.setInterval(5 * 1 * 1000)
+        self.rogue_timer.start()
 
     def start_rogue(self):  # 肉鸽主函数
         global adb_path, rogue_name
