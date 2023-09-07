@@ -50,6 +50,11 @@
     "taps": "750,750"
   },
   {
+    "image": "menu.png",
+    "threshold": "0.9",
+    "taps": "open_game"
+  },
+  {
     "image": "exitsami.png",
     "threshold": "0.9",
     "taps": "845,540;960,980"

@@ -145,6 +145,11 @@ class TimerThread(QThread):  # 多线程，用于账号切换
                     for point in taps:
                         if point == "exit":  # 坐标支持特殊项：exit，作用为结束识图步骤，开始输入账号密码
                             begin_login = True
+                        elif point == "open_game":
+                            logger.debug("[Child Thread]Starting Arknights...")
+                            run_command(
+                                pre_input + 'monkey -p com.hypergryph.arknights -c android.intent.category.LAUNCHER 1')
+                            # 打开!方舟
                         else:
                             tap_point(pre_input, int(point.split(",")[0]), int(point.split(",")[1]),
                                              size_x, size_y)
@@ -163,7 +168,6 @@ class TimerThread(QThread):  # 多线程，用于账号切换
             if begin_login:
                 logger.debug("[Child Thread]Start to input account and password.")
                 break
-
         tap_point(pre_input, 900, 415, size_x, size_y)  # 输入账号
         time.sleep(t)
         run_command(pre_input + 'input text ' + account)
@@ -827,7 +831,7 @@ class InputDialog(QDialog):
 
     def start_rogue_timer(self):
         self.rogue_timer.timeout.connect(lambda: self.start_rogue())
-        self.rogue_timer.setInterval(5 * 1 * 1000)
+        self.rogue_timer.setInterval(5 * 60 * 1000)
         self.rogue_timer.start()
 
     def start_rogue(self):  # 肉鸽主函数
