@@ -57,14 +57,14 @@ class PrintOutput(QPlainTextEdit):  # print重写
     def write(self, text):
         self.cache += text
         if text.endswith('\n'):
-            current_time = datetime.now().strftime("%m.%d %H:%M:%S")
+            current_time = datetime.now().strftime("%m-%d %H:%M:%S")
             text_with_time = f"{current_time} {self.cache}"
             self.cache = ""
 
             cursor = self.textCursor()
             cursor.movePosition(cursor.End)
             cursor.insertText(text_with_time)
-            cursor.insertText('\n')  # 另起一行
+            cursor.insertText('\n')
             self.setTextCursor(cursor)
             self.ensureCursorVisible()
 
@@ -99,8 +99,8 @@ class TimerThread(QThread):  # 多线程，用于账号切换
             asst.stop()
         except:
             pass
-        # if dialog.rogue_timer.isActive():
-        #     dialog.rogue_timer.stop()
+        if dialog.rogue_timer.isActive():
+            dialog.rogue_timer.stop()
         tapdelay = float(dialog.tapdelay.text())
         t = tapdelay
         i = None
@@ -830,6 +830,7 @@ class InputDialog(QDialog):
     #     return [input_group[0].text() for input_group in self.inputs]
 
     def start_rogue_timer(self):
+        self.rogue_timer = QTimer(self)
         self.rogue_timer.timeout.connect(lambda: self.start_rogue())
         self.rogue_timer.setInterval(5 * 60 * 1000)
         self.rogue_timer.start()
