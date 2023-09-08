@@ -114,7 +114,9 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         print("成功连接至", dialog.sim_name.currentText())
         logger.debug("[Child Thread]Successfully connect to simulator.")
         time.sleep(2)
-        run_command(pre_input + 'am force-stop com.zdanjian.zdanjian')  # 关闭自动精灵(你可以用自动精灵，不会出事)
+        logger.debug("[Child Thread]Killing 自动精灵...")
+        subprocess.run(''.join([pre_input, 'am force-stop com.zdanjian.zdanjian']), shell=True)  # 关闭自动精灵(你可以用自动精灵，不会出事)
+        time.sleep(2)
         size = os.popen(pre_input + 'wm size').read()
         size = size[size.find(":") + 2:]
         size_x = int(size[:  size.find("x")])
@@ -238,14 +240,14 @@ def get_process_path(process_name):  # 获取进程的绝对位置
                     path1 = ''.join([str(path2), r'\HD-Adb.exe'])
                 elif sim_name == 'mumu':
                     path1 = ''.join([str(path2.parent), r'\vmonitor\bin\adb_server.exe'])
-                path1 = ''.join(['"', path1, '"'])
+                path1 = r''.join(['"', path1, '"'])
                 return path1
         path1 = ''.join([str(pathlib.Path(__file__).parent.parent), r'\adb\platform-tools\adb.exe'])
-        path1 = ''.join(['"', path1, '"'])
+        path1 = r''.join(['"', path1, '"'])
         return path1
     else:
         path1 = ''.join([str(pathlib.Path(__file__).parent.parent), r'\adb\platform-tools\adb.exe'])
-        path1 = ''.join(['"', path1, '"'])
+        path1 = r''.join(['"', path1, '"'])
         return path1
 
 
