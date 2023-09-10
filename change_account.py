@@ -115,7 +115,10 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         logger.debug("[Child Thread]Successfully connect to simulator.")
         time.sleep(2)
         logger.debug("[Child Thread]Killing 自动精灵...")
-        subprocess.run(''.join([pre_input, 'am force-stop com.zdanjian.zdanjian']), shell=True)  # 关闭自动精灵(你可以用自动精灵，不会出事)
+        try:
+            subprocess.run(''.join([pre_input, 'am force-stop com.zdanjian.zdanjian']), shell=True)  # 关闭自动精灵(你可以用自动精灵，不会出事)
+        except:
+            pass
         time.sleep(2)
         size = os.popen(pre_input + 'wm size').read()
         size = size[size.find(":") + 2:]
@@ -277,6 +280,7 @@ class InputDialog(QDialog):
             pre_input + "screencap -p /sdcard/ss.png")
         time.sleep(1)  # adb: error:
         logger.debug("Pulling image to dump path")
+        i = 0
         while True:
             if sim_name == 'ld':
                 popen = os.popen(
@@ -299,7 +303,16 @@ class InputDialog(QDialog):
             logger.debug(popen)
             if popen.startswith("adb: error:") is False:
                 break
+            elif i >= 10:
+                logger.debug("Reached the maximum retry limit, capture again.")
+                run_command(
+                    pre_input + "screencap -p /sdcard/ss.png")
+                i = 0
+            else:
+                i += 1
+                logger.debug(f"Failed to pull image, retrying {i} times")
             time.sleep(0.5)
+            time.sleep(1)
         logger.debug("Loading image...")
         img = cv2.imread(dump_path + r'\ss.png')
         i = 0
@@ -686,6 +699,7 @@ class InputDialog(QDialog):
     def switch_btn_command(self):
         self.save_info()
         if self.account_timer is not None:
+            self.stop_command()
             self.start_command()
 
     def start_command(self):  # 开始按钮

@@ -21,7 +21,7 @@ header_login = {
     'Accept-Encoding': 'gzip',
     'Connection': 'close'
 }
-# 签到url
+# 签到urlpip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 sign_url = "https://zonai.skland.com/api/v1/game/attendance"
 # 绑定的角色url
 binding_url = "https://zonai.skland.com/api/v1/game/player/binding"
