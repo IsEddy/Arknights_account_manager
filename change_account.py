@@ -864,8 +864,8 @@ class InputDialog(QDialog):
             logger.debug("[Rogue Timer]Detected that MAA stop,start rogue.")
             logger.debug(f"[Rogue Timer]Rogue task:{rogue_name}")
             print('此次肉鸽任务为：', rogue_name)
-            # 触控方案配置  请务必设置adbinput！！！！！！！！！！！  # 戳啦，都能用啦（
-            if asst.set_instance_option(InstanceOptionType.touch_type, 'minitouch'):
+            # 触控方案配置  请务必设置adbinput！！！！！！！！！！！  # 戳啦，都能用啦（ # 最新消息，minitouch有几率不能用
+            if asst.set_instance_option(InstanceOptionType.touch_type, 'adb'):
                 logger.debug("[Rogue Timer]Adb connection successful!")
                 print('Adb连接成功！')
             else:
