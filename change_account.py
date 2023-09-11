@@ -1,25 +1,22 @@
+import os
+import pathlib
+import subprocess
+import sys
+from datetime import datetime, timedelta
+
+import cv2
+import psutil
+import qdarktheme
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
+from PyQt5.QtGui import QIcon, QFont, QDoubleValidator, QTextCharFormat, QColor, QTextCursor
 from PyQt5.QtWidgets import QFormLayout, QDialog, QLineEdit, QTimeEdit, QApplication, QCheckBox, QPushButton, \
     QMessageBox, QComboBox, QPlainTextEdit, QHBoxLayout
-from PyQt5.QtCore import QTimer, Qt, QDateTime, QThread, pyqtSignal, pyqtSlot, QMetaObject
-from PyQt5.QtGui import QIcon, QFont, QDoubleValidator
-from datetime import datetime, timedelta
-import sys
-import json
-import os
-import time
-import cv2
-import qdarktheme
-import psutil
-import pathlib
-import logging
-import subprocess
 
 from asst.asst import Asst
-from asst.utils import InstanceOptionType  # MAA的集成，用于肉鸽
 from asst.emulator import Bluestacks  # MAA的集成，用于获取蓝叠的adbport
-
-from asst.switchbutton import SwitchBtn, InvisibleButton  # 自定义的两个按钮库
 from asst.skyland import *  # 森空岛签到，by xxyz30
+from asst.switchbutton import SwitchBtn, InvisibleButton  # 自定义的两个按钮库
+from asst.utils import InstanceOptionType  # MAA的集成，用于肉鸽
 
 if not os.path.exists('debug'):
     os.makedirs('debug')
@@ -30,6 +27,7 @@ console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)  # 设置控制台处理器的级别
 console_handler.setFormatter(logging.Formatter('[%(asctime)s] - %(name)s - %(levelname)s: %(message)s'))
 logger.addHandler(console_handler)
+
 
 group_count = 1
 theme = 'light'
@@ -63,10 +61,25 @@ class PrintOutput(QPlainTextEdit):  # print重写
 
             cursor = self.textCursor()
             cursor.movePosition(cursor.End)
+            format = QTextCharFormat()
+            if hasattr(self, 'is_error') and self.is_error:  # 错误输出为红色
+                format.setForeground(QColor("red"))
+            cursor.setCharFormat(format)
             cursor.insertText(text_with_time)
             cursor.insertText('\n')
             self.setTextCursor(cursor)
             self.ensureCursorVisible()
+    def flush(self):
+        pass
+
+def print_error(*args, **kwargs):
+    # Set is_error attribute to True when calling print_error
+    if 'file' not in kwargs:
+        kwargs['file'] = sys.stdout
+    kwargs['file'].is_error = True
+    print(*args, **kwargs)
+    # Reset is_error attribute to False
+    kwargs['file'].is_error = False
 
 
 class TimerThread(QThread):  # 多线程，用于账号切换
@@ -304,13 +317,13 @@ class InputDialog(QDialog):
             if popen.startswith("adb: error:") is False:
                 break
             elif i >= 10:
-                logger.debug("Reached the maximum retry limit, capture again.")
+                logger.error("Reached the maximum retry limit, capture again.")
                 run_command(
                     pre_input + "screencap -p /sdcard/ss.png")
                 i = 0
             else:
                 i += 1
-                logger.debug(f"Failed to pull image, retrying {i} times")
+                logger.error(f"Failed to pull image, retrying {i} times")
             time.sleep(0.5)
             time.sleep(1)
         logger.debug("Loading image...")
@@ -318,12 +331,13 @@ class InputDialog(QDialog):
         i = 0
         while img is None or img.size == 0:
             i += 1
-            logger.debug(f"Loading image failed! Retrying count {i}...")
+            logger.error(f"Loading image failed! Retrying count {i}...")
             img = cv2.imread(dump_path + r'\ss.png')
             logger.debug(f"Wait {tapdelay}second to load image...")
-            time.sleep(0.5)
+            time.sleep(1)
             if i == 10:
-                logger.debug("Reached the maximum retry limit.")
+                logger.error("Reached the maximum retry limit.")
+                print_error("截图失败！")
                 return None
         img = cv2.resize(img, (1920, 1080))
         return img
@@ -425,7 +439,8 @@ class InputDialog(QDialog):
             else:
                 adb_port = os.popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe adb -v 0').read()
             if adb_port == '':
-                logger.debug('Failed to get mumu12 adb port')
+                logger.error('Failed to get mumu12 adb port')
+                print_error("获取mumu12模拟器adb端口失败！")
                 adb_port = '127.0.0.1:5555'
             pre_input = ''.join([adb_path + ' shell '])
         elif self.sim_name.currentText() == '蓝叠模拟器':
@@ -433,7 +448,8 @@ class InputDialog(QDialog):
             try:
                 adb_port = Bluestacks.get_hyperv_port(r"C:\ProgramData\BlueStacks_nxt\bluestacks.conf", "Pie64_1")
             except:
-                logger.debug('Failed to get bluestacks adb port')
+                logger.error('Failed to get bluestacks adb port')
+                print_error("获取蓝叠模拟器adb端口失败！")
                 adb_port = '127.0.0.1:5555'
             adb_path = get_process_path('HD-Player.exe')
             pre_input = ''.join([adb_path + ' -s ' + adb_port + ' shell '])
@@ -794,9 +810,10 @@ class InputDialog(QDialog):
                     token = login_by_password(times.get(m)[0], times.get(m)[1])
                     cred = get_cred_by_token(token)
                     print(do_sign(cred))
+                    logger.debug(do_sign(cred))
                 except:
-                    print("森空岛签到失败，请检查网络代理")
-                    logger.debug("[Sign Timer]Failed to Sign Skyland, maybe the VPN is on?")
+                    print_error("森空岛签到失败，请检查网络代理")
+                    logger.error("[Sign Timer]Failed to Sign Skyland, maybe the VPN is on?")
 
         if current_time == '03:55':
             logger.debug("Restarting game...")
@@ -869,8 +886,8 @@ class InputDialog(QDialog):
                 logger.debug("[Rogue Timer]Adb connection successful!")
                 print('Adb连接成功！')
             else:
-                logger.debug("[Rogue Timer]Adb connection failed, Task stop!")
-                print('Adb连接失败，任务终止！')
+                logger.error("[Rogue Timer]Adb connection failed, Task stop!")
+                print_error('Adb连接失败，任务终止！')
                 exit()
             try:
                 if self.rogue_timer.isActive() is True:
