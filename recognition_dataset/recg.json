@@ -55,6 +55,16 @@
     "taps": "open_game"
   },
   {
+    "image": "exitinfrast.png",
+    "threshold": "0.9",
+    "taps": "1420,750"
+  },
+  {
+    "image": "exitsellect.png",
+    "threshold": "0.9",
+    "taps": "75,65"
+  },
+  {
     "image": "exitsami.png",
     "threshold": "0.9",
     "taps": "845,540;960,980"

@@ -39,6 +39,7 @@ adb_path = ''
 adb_port = ''
 pre_input = ''
 tapdelay = 3
+do_count = 0  # 用于一键清日常的计数
 if_debug = False
 version = 0.11
 is_running = False
@@ -371,8 +372,11 @@ class InputDialog(QDialog):
         self.rogue_btn = QPushButton('手动开始打肉鸽', self)
         self.rogue_btn.clicked.connect(self.start_rogue)
 
-        self.hidden_btn = InvisibleButton("Hello", self)
+        self.hidden_btn = InvisibleButton("deeebuuuggg", self)
         self.hidden_btn.clicked.connect(self.deeebuuuggg)
+
+        self.one_key = QPushButton('一键全部清日常', self)
+        self.one_key.clicked.connect(self.one_key_btn_command)
 
         self.tapdelay = QLineEdit()
         self.tapdelay.setText("3")
@@ -426,6 +430,7 @@ class InputDialog(QDialog):
             adb_port = '127.0.0.1:5555'
             adb_path = get_process_path('dnplayer.exe')
             pre_input = ''.join([adb_path + ' -s emulator-5554 shell '])
+            # pre_input = ''.join([adb_path + ' -s 127.0.0.1:5555 shell '])
         elif self.sim_name.currentText() == 'MuMu 模拟器':
             sim_name = 'mumu'
             adb_port = '127.0.0.1:7555'
@@ -485,7 +490,7 @@ class InputDialog(QDialog):
                 password_edit = input_group[1]
                 password_edit.setEchoMode(QLineEdit.Password)
             if_debug = False
-            sleeptime = 20
+            sleeptime = 60
             print(f"检测时间调整为{sleeptime}，密码已隐藏，debug模式关闭")
 
     def add_input(self):
@@ -556,7 +561,9 @@ class InputDialog(QDialog):
         self.form.addRow(self.start_btn, self.add_button)
         self.form.addRow(self.stop_btn, self.del_button)
         self.form.addRow(self.change_btn, self.rogue_btn)
+        self.form.addRow(self.one_key)
         self.form.addRow(self.cpdtext, self.tapdelay)
+
         group_count += 1
 
     def del_input(self):
@@ -710,6 +717,7 @@ class InputDialog(QDialog):
         self.form.addRow(self.start_btn, self.add_button)
         self.form.addRow(self.stop_btn, self.del_button)
         self.form.addRow(self.change_btn, self.rogue_btn)
+        self.form.addRow(self.one_key)
         self.form.addRow(self.cpdtext, self.tapdelay)
 
     def switch_btn_command(self):
@@ -717,6 +725,55 @@ class InputDialog(QDialog):
         if self.account_timer is not None:
             self.stop_command()
             self.start_command()
+
+    def one_key_btn_command(self):
+        global do_count
+        logger.debug("One key timer start!")
+        print("一键清理智开始")
+        do_count = 1
+        with open("info.txt", "r") as f:
+            times = {}
+            data = json.load(f)  # 加载json格式的数据为字典对象
+            i = 0
+            for group in data:  # 遍历字典中的每一组数据
+                i += 1
+                account = group["account"]
+                password = group["password"]
+                rogue_name = group["rogue_name"]  # 0为萨米，1为水月，2为愧影
+                account_switch = group["switch"]
+                if account_switch:
+                    if rogue_name == 0:
+                        rogue_name = "Sami"
+                    elif rogue_name == 1:
+                        rogue_name = "Mizuki"
+                    elif rogue_name == 2:
+                        rogue_name = "Phantom"
+                    times[i] = [account, password, False, rogue_name]
+        self.one_key_timer = QTimer(self)
+        self.one_key_timer.timeout.connect(lambda: self.one_key_command(times))
+        self.one_key_timer.start(sleeptime * 1000)
+
+    def one_key_command(self, times):
+        global do_count, group_count
+        self.save_info()
+        self.setWindowTitle(app_name + '：开始运行！')
+        with open(''.join([str(pathlib.Path(__file__).parent.parent), r'\MAA.Judge']), "r") as f:
+            judge = f.readlines()[-1]
+            logger.debug(f"[One Key Timer]Detect MAA:{judge}")
+            print(f'MAA当前状态：{judge}')
+            f.close()
+        for i in times:
+            if judge == 'Stop' and do_count == i-1:
+                timer_thread = TimerThread(times[i][0], times[i][1], times[i][2], times[i][3])
+                if is_running is False:
+                    do_count += 1
+                    print(f"执行账号：{times[i][0]}!")
+                    timer_thread.start()
+                time.sleep(2)
+                if do_count == group_count:
+                    logger.info("[One Key Timer]All account complete!")
+                    print("所有账号执行完毕！")
+                    self.one_key_timer.stop()
 
     def start_command(self):  # 开始按钮
         logger.debug("Account timer start!")
@@ -856,7 +913,6 @@ class InputDialog(QDialog):
                 self.account_timer_thread.signal_start_rogue.connect(self.start_rogue_timer)
                 if is_running is False:
                     self.account_timer_thread.start()
-                time.sleep(2)
                 # TimerThread.run(times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4])
 
     # def getInputs(self):
