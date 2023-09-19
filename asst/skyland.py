@@ -1,15 +1,20 @@
+import hashlib
+import hmac
 import json
 import os.path
 import time
 from getpass import getpass
 import logging
+from urllib import parse
+
 import requests
 
 from datetime import date
 
 token_save_name = 'TOKEN.txt'
 app_code = '4ca99fa6b56cc2ba'
-is_github_action = os.environ.get('GitHub_Actions')
+token_env = os.environ.get('TOKEN')
+sign_token = ''
 header = {
     'cred': '',
     'User-Agent': 'Skland/1.0.1 (com.hypergryph.skland; build:100001014; Android 31; ) Okhttp/4.11.0',
@@ -21,7 +26,17 @@ header_login = {
     'Accept-Encoding': 'gzip',
     'Connection': 'close'
 }
-# 签到urlpip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 签名请求头一定要这个顺序，否则失败
+# timestamp是必填的,其它三个随便填,不要为none即可
+header_for_sign = {
+    'platform': '',
+    'timestamp': '',
+    'dId': '',
+    'vName': ''
+}
+
+# 签到url
 sign_url = "https://zonai.skland.com/api/v1/game/attendance"
 # 绑定的角色url
 binding_url = "https://zonai.skland.com/api/v1/game/player/binding"
@@ -49,9 +64,6 @@ def config_logger():
     file_handler.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     file_handler.setFormatter(formatter)
-
-    if is_github_action:
-        return
 
     def filter_code(text):
         filter_key = ['code', 'cred', 'token']
@@ -85,13 +97,48 @@ def config_logger():
     requests.post = post
 
 
+def generate_signature(token: str, path, body_or_query):
+    """
+    获得签名头
+    接口地址+方法为Get请求？用query否则用body+时间戳+ 请求头的四个重要参数（dId，platform，timestamp，vName）.toJSON()
+    将此字符串做HMAC加密，算法为SHA-256，密钥token为请求cred接口会返回的一个token值
+    再将加密后的字符串做MD5即得到sign
+    :param token: 拿cred时候的token
+    :param path: 请求路径（不包括网址）
+    :param body_or_query: 如果是GET，则是它的query。POST则为它的body
+    :return: 计算完毕的sign
+    """
+    t = str(int(time.time()))
+    token = token.encode('utf-8')
+    header_ca = json.loads(json.dumps(header_for_sign))
+    header_ca['timestamp'] = t
+    header_ca_str = json.dumps(header_ca, separators=(',', ':'))
+    s = path + body_or_query + t + header_ca_str
+    hex_s = hmac.new(token, s.encode('utf-8'), hashlib.sha256).hexdigest()
+    md5 = hashlib.md5(hex_s.encode('utf-8')).hexdigest().encode('utf-8').decode('utf-8')
+    logging.info(f'算出签名: {md5}')
+    return md5, header_ca
+
+
+def get_sign_header(url: str, method, body, old_header):
+    h = json.loads(json.dumps(old_header))
+    p = parse.urlparse(url)
+    if method.lower() == 'get':
+        h['sign'], header_ca = generate_signature(sign_token, p.path, p.query)
+    else:
+        h['sign'], header_ca = generate_signature(sign_token, p.path, json.dumps(body))
+    for i in header_ca:
+        h[i] = header_ca[i]
+    return h
+
+
 def login_by_code():
     phone = input('请输入手机号码：')
     resp = requests.post(login_code_url, json={'phone': phone, 'type': 2}, headers=header_login).json()
     if resp.get("status") != 0:
         raise Exception(f"发送手机验证码出现错误：{resp['msg']}")
     code = input("请输入手机验证码：")
-    r = requests.get(token_phone_code_url, json={"phone": phone, "code": code}, headers=header_login).json()
+    r = requests.post(token_phone_code_url, json={"phone": phone, "code": code}, headers=header_login).json()
     return get_token(r)
 
 
@@ -129,11 +176,14 @@ def get_token(resp):
 
 
 def get_grant_code(token):
-    resp = requests.post(grant_code_url, json={
+    response = requests.post(grant_code_url, json={
         'appCode': app_code,
         'token': token,
         'type': 0
-    }, headers=header_login).json()
+    }, headers=header_login)
+    resp = response.json()
+    if response.status_code != 200:
+        raise Exception(f'获得认证代码失败：{resp}')
     if resp.get('status') != 0:
         raise Exception(f'获得认证代码失败：{resp["msg"]}')
     return resp['data']['code']
@@ -145,13 +195,14 @@ def get_cred(grant):
         'kind': 1
     }, headers=header_login).json()
     if resp['code'] != 0:
-        raise Exception(f'获得cred失败：{resp["messgae"]}')
-    return resp['data']['cred']
+        raise Exception(f'获得cred失败：{resp["message"]}')
+    return resp['data']
 
 
 def get_binding_list():
     v = []
-    resp = requests.get(binding_url, headers=header).json()
+    resp = requests.get(binding_url, headers=get_sign_header(binding_url, 'get', None, header)).json()
+
     if resp['code'] != 0:
         print(f"请求角色列表出现问题：{resp['message']}")
         if resp.get('message') == '用户未登录':
@@ -165,29 +216,41 @@ def get_binding_list():
     return v
 
 
-def do_sign(cred):
-    header['cred'] = cred
+def list_awards(game_id, uid):
+    resp = requests.get(sign_url, headers=header, params={'gameId': game_id, 'uid': uid}).json()
+    print(resp)
+
+
+def do_sign(cred_resp):
+    # 加到全局里去吧，反正没有多线程
+    global sign_token
+    sign_token = cred_resp['token']
+    header['cred'] = cred_resp['cred']
     characters = get_binding_list()
+
     for i in characters:
         body = {
-            'uid': i.get('uid'),
-            'gameId': i.get("channelMasterId")
+            'gameId': 1,
+            'uid': i.get('uid')
         }
-        resp = requests.post(sign_url, headers=header, json=body).json()
+        # list_awards(1, i.get('uid'))
+        resp = requests.post(sign_url, headers=get_sign_header(sign_url, 'post', body, header), json=body).json()
         if resp['code'] != 0:
-            r = f'角色{i.get("nickName")}({i.get("channelName")})签到失败了！原因：{resp.get("message")}'
+            print(f'角色{i.get("nickName")}({i.get("channelName")})签到失败了！原因：{resp.get("message")}')
             continue
         awards = resp['data']['awards']
         for j in awards:
             res = j['resource']
-            r = f'角色{i.get("nickName")}({i.get("channelName")})签到成功，获得了{res["name"]}×{j.get("count") or 1}'
-    return r
+            print(
+                f'角色{i.get("nickName")}({i.get("channelName")})签到成功，获得了{res["name"]}×{j.get("count") or 1}'
+            )
 
 
 def save(token):
     with open(token_save_name, 'w') as f:
         f.write(token)
-    print(f'您的鹰角网络通行证已经保存在{token_save_name}, 打开这个可以把它复制到云函数服务器上执行!\n如果需要再次运行，删除创建的这个文件即可')
+    print(
+        f'您的鹰角网络通行证已经保存在{token_save_name}, 打开这个可以把它复制到云函数服务器上执行!\n如果需要再次运行，删除创建的这个文件即可')
 
 
 def read(path):
@@ -199,13 +262,9 @@ def read(path):
     return v
 
 
-def read_github_action():
-    tokens = os.environ.get('TOKEN')
-    if not tokens:
-        print('请在"secrets and variables"里添加Token!')
-        return []
+def read_from_env():
     v = []
-    token_list = tokens.split('\n')
+    token_list = token_env.split(',')
     for i in token_list:
         i = i.strip()
         if i and i not in v:
@@ -215,18 +274,18 @@ def read_github_action():
 
 
 def do_init():
-    if is_github_action:
-        print('使用Github Action')
+    if token_env:
+        print('使用环境变量里面的token')
         # 对于github action,不需要存储token,因为token在环境变量里
-        return read_github_action()
+        return read_from_env()
 
-    token = ''
     # 检测文件里是否有token
     if os.path.exists(token_save_name):
         v = read(token_save_name)
         if v:
             return v
     # 没有的话
+    token = ''
     print("请输入你需要做什么：")
     print("1.使用用户名密码登录（非常推荐，但可能因为人机验证失败）")
     print("2.使用手机验证码登录（非常推荐，但可能因为人机验证失败）")
@@ -239,29 +298,31 @@ def do_init():
     elif mode == '3':
         token = login_by_token()
     else:
-        exit()
+        exit(-1)
     save(token)
     return [token]
 
 
 # def start():
-#     try:
-#         token = do_init()
-#         for i in token:
+#     token = do_init()
+#     for i in token:
+#         try:
 #             do_sign(get_cred_by_token(i))
-#         print("签到完成！")
-#     except Exception as ex:
-#         print(f'签到失败，原因：{str(ex)}')
-#         logging.error(exc_info=ex)
-
-
-# print('本项目源代码仓库：https://github.com/xxyz30/skyland-auto-sign')
-# config_logger()
+#         except Exception as ex:
+#             print(f'签到失败，原因：{str(ex)}')
+#             logging.error('', exc_info=ex)
+#     print("签到完成！")
 #
-# logging.info('=========starting==========')
 #
-# start_time = time.time()
-# start()
-# end_time = time.time()
-# logging.info(f'complete with {(end_time - start_time) * 1000} ms')
-# logging.info('===========ending============')
+# if __name__ == '__main__':
+#     print('本项目源代码仓库：https://github.com/xxyz30/skyland-auto-sign(已被github官方封禁)')
+#     print('https://gitee.com/FancyCabbage/skyland-auto-sign')
+#     config_logger()
+#
+#     logging.info('=========starting==========')
+#
+#     start_time = time.time()
+#     start()
+#     end_time = time.time()
+#     logging.info(f'complete with {(end_time - start_time) * 1000} ms')
+#     logging.info('===========ending============')
