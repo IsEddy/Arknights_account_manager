@@ -293,9 +293,9 @@ class InputDialog(QDialog):
         run_command(
             pre_input + "screencap -p /sdcard/ss.png")
         time.sleep(1)  # adb: error:
-        logger.debug("Pulling image to dump path")
         i = 0
         while True:
+            logger.debug("Pulling image to dump path")
             if sim_name == 'ld':
                 popen = os.popen(
                     adb_path + " -s emulator-5554 pull /sdcard/ss.png " + dump_path).read()
@@ -670,7 +670,6 @@ class InputDialog(QDialog):
 
         self.showshow()
         self.save_info()
-        self.account_timer = None
 
     def save_info(self):
         global group_count
@@ -722,7 +721,7 @@ class InputDialog(QDialog):
 
     def switch_btn_command(self):
         self.save_info()
-        if self.account_timer is not None:
+        if self.account_timer.isActive():
             self.stop_command()
             self.start_command()
 
@@ -730,18 +729,18 @@ class InputDialog(QDialog):
         global do_count
         logger.debug("One key timer start!")
         print("一键清理智开始")
-        do_count = 1
+        do_count = 0
         with open("info.txt", "r") as f:
             times = {}
             data = json.load(f)  # 加载json格式的数据为字典对象
             i = 0
             for group in data:  # 遍历字典中的每一组数据
-                i += 1
                 account = group["account"]
                 password = group["password"]
                 rogue_name = group["rogue_name"]  # 0为萨米，1为水月，2为愧影
                 account_switch = group["switch"]
                 if account_switch:
+                    i += 1
                     if rogue_name == 0:
                         rogue_name = "Sami"
                     elif rogue_name == 1:
@@ -780,7 +779,7 @@ class InputDialog(QDialog):
         print("将执行以下账号：")
         self.save_info()
         self.setWindowTitle(app_name + '：开始运行！')
-        if self.account_timer is not None:
+        if self.account_timer.isActive():
             self.account_timer.stop()
         with open("info.txt", "r") as f:
             times = {}  # 创建一个空字典，用于存放时间和对应的数据
