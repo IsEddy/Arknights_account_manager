@@ -95,11 +95,10 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         self.group = group
 
     def run(self):  # 换号主函数
-        global is_running
+        global is_running, adb_path, tapdelay, sim_name, adb_port, pre_input, path
         is_running = True
         logger.debug("[Child Thread]Account change thread start!")
         dialog = InputDialog()
-        global adb_path, tapdelay, sim_name, adb_port, pre_input, path
         account = self.account
         password = self.password
         if_rogue = self.if_rogue
@@ -120,11 +119,10 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         i = None
         logger.debug("[Child Thread]Connecting simulator...")
         print("正在接模拟器")
+        subprocess.run(''.join([adb_path + ' connect ' + adb_port]), shell=True)
+        popen = os.popen(''.join([adb_path + ' devices']))  # 有几率出问题？？？
         if sim_name == 'bluestacks':
-            subprocess.run(''.join([adb_path + ' connect ' + adb_port]), shell=True)
             subprocess.run(''.join([pre_input + 'input su']), shell=True)
-        else:
-            subprocess.run(''.join([adb_path + ' connect ' + adb_port]), shell=True)
         print("成功连接至", dialog.sim_name.currentText())
         logger.debug("[Child Thread]Successfully connect to simulator.")
         time.sleep(2)
