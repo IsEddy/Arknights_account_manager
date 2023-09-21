@@ -2,6 +2,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import time
 from datetime import datetime, timedelta
 
 import cv2
@@ -234,6 +235,7 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         if if_rogue and dialog.rogue_timer.isActive() is False:  # 开启肉鸽定时器
             logger.debug("[Child Thread]Start Rogue timer!")
             self.signal_start_rogue.emit()
+        time.sleep(10)
         logger.debug("[Child Thread]Task Complete")
         is_running = False
 
@@ -745,7 +747,7 @@ class InputDialog(QDialog):
                         rogue_name = "Mizuki"
                     elif rogue_name == 2:
                         rogue_name = "Phantom"
-                    times[i] = [account, password, False, rogue_name]
+                    times[i] = [account, password, False, group["group"]]
         self.one_key_timer = QTimer(self)
         self.one_key_timer.timeout.connect(lambda: self.one_key_command(times))
         self.one_key_timer.start(sleeptime * 1000)
