@@ -224,7 +224,7 @@ class TimerThread(QThread):  # 多线程，用于账号切换
                 command = ''.join(
                     [str(pathlib.Path(__file__).parent.parent), r"\maa.exe --config ", 'account', str(group)])
                 logger.debug("[Child Thread]Start MAA in config account" + str(group))
-            elif ''.join(['main', str(group)]) in data['Configurations']:
+            elif 'main' in data['Configurations']:
                 command = ''.join([str(pathlib.Path(__file__).parent.parent), r"\maa.exe --config main"])
                 logger.debug("[Child Thread]Start MAA in config main")
             else:
@@ -235,10 +235,15 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         if if_rogue and dialog.rogue_timer.isActive() is False:  # 开启肉鸽定时器
             logger.debug("[Child Thread]Start Rogue timer!")
             self.signal_start_rogue.emit()
-        time.sleep(10)
+        with open(''.join([str(pathlib.Path(__file__).parent.parent), r'\MAA.Judge']), "r") as f:
+            judge = f.readlines()[-1]
+            f.close()
+        while judge == "Stop":
+            with open(''.join([str(pathlib.Path(__file__).parent.parent), r'\MAA.Judge']), "r") as f:
+                judge = f.readlines()[-1]
+                f.close()
         logger.debug("[Child Thread]Task Complete")
         is_running = False
-
 
     def stop(self):
         self.is_running = False
@@ -296,6 +301,7 @@ class InputDialog(QDialog):
         i = 0
         while True:
             logger.debug("Pulling image to dump path")
+            time.sleep(1)
             if sim_name == 'ld':
                 popen = os.popen(
                     adb_path + " -s emulator-5554 pull /sdcard/ss.png " + dump_path).read()
@@ -325,8 +331,6 @@ class InputDialog(QDialog):
             else:
                 i += 1
                 logger.error(f"Failed to pull image, retrying {i} times")
-            time.sleep(0.5)
-            time.sleep(1)
         logger.debug("Loading image...")
         img = cv2.imread(dump_path + r'\ss.png')
         i = 0
