@@ -773,6 +773,7 @@ class InputDialog(QDialog):
                     print(f"执行账号：{times[i][0]}!")
                     timer_thread.start()
                 time.sleep(2)
+
                 if do_count == group_count:
                     logger.info("[One Key Timer]All account complete!")
                     print("所有账号执行完毕！")
