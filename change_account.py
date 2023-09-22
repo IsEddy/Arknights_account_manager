@@ -236,11 +236,11 @@ class TimerThread(QThread):  # 多线程，用于账号切换
             logger.debug("[Child Thread]Start Rogue timer!")
             self.signal_start_rogue.emit()
         with open(''.join([str(pathlib.Path(__file__).parent.parent), r'\MAA.Judge']), "r") as f:
-            judge = f.readlines()[-1]
+            judge = f.read()
             f.close()
         while judge == "Stop":
             with open(''.join([str(pathlib.Path(__file__).parent.parent), r'\MAA.Judge']), "r") as f:
-                judge = f.readlines()[-1]
+                judge = f.read()
                 f.close()
         logger.debug("[Child Thread]Task Complete")
         is_running = False
