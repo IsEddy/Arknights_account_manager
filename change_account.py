@@ -798,6 +798,10 @@ class InputDialog(QDialog):
                 rogue = group["if_rogue"]
                 rogue_name = group["rogue_name"]  # 0为萨米，1为水月，2为愧影
                 account_switch = group["switch"]
+                if i == 1:
+                    run_command(r'schtasks /create /tn "WakeUp" /tr "C:\Windows\System32\cmd.exe /c ECHO '+'WakeUp'+' & pause" /sc ones /st ' + time)
+                    logger.info(f"Create Windows WakeUp task at time {time}.")
+                    print("根据最早的启动时间新建了Windows唤醒任务！")
                 if account_switch:
                     if rogue_name == 0:
                         rogue_name = "Sami"
