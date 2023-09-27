@@ -98,7 +98,7 @@ class TimerThread(QThread):  # 多线程，用于账号切换
     def run(self):  # 换号主函数
         global is_running, adb_path, tapdelay, sim_name, adb_port, pre_input, path
         is_running = True
-        logger.debug("[Child Thread]Account change thread start!")
+        logger.info("[Child Thread]Account change thread start!")
         dialog = InputDialog()
         account = self.account
         password = self.password
@@ -106,9 +106,9 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         group = self.group
         # 终止MAA
         print("尝试终止MAA ...")
-        logger.debug("[Child Thread]Killing MAA...")
+        logger.info("[Child Thread]Killing MAA...")
         popen = os.popen('wmic process where name="maa.exe" call terminate 2>&1').read()
-        logger.debug(popen)
+        logger.info(popen)
         try:
             asst.stop()
         except:
@@ -118,16 +118,16 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         tapdelay = float(dialog.tapdelay.text())
         t = tapdelay
         i = None
-        logger.debug("[Child Thread]Connecting simulator...")
+        logger.info("[Child Thread]Connecting simulator...")
         print("正在接模拟器")
         subprocess.run(''.join([adb_path + ' connect ' + adb_port]), shell=True)
         popen = os.popen(''.join([adb_path + ' devices']))  # 有几率出问题？？？
         if sim_name == 'bluestacks':
             subprocess.run(''.join([pre_input + 'input su']), shell=True)
         print("成功连接至", dialog.sim_name.currentText())
-        logger.debug("[Child Thread]Successfully connect to simulator.")
+        logger.info("[Child Thread]Successfully connect to simulator.")
         time.sleep(2)
-        logger.debug("[Child Thread]Killing 自动精灵...")
+        logger.info("[Child Thread]Killing 自动精灵...")
         try:
             subprocess.run(''.join([pre_input, 'am force-stop com.zdanjian.zdanjian']), shell=True)  # 关闭自动精灵(你可以用自动精灵，不会出事)
         except:
@@ -138,14 +138,14 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         size_x = int(size[:  size.find("x")])
         size_y = int(size[size.find("x") + 1:])
         print('当前分辨率：' + ''.join([str(size_x), "x", str(size_y)]))
-        logger.debug('[Child Thread]Current resolution：' + ''.join([str(size_x), "x", str(size_y)]))
+        logger.info('[Child Thread]Current resolution：' + ''.join([str(size_x), "x", str(size_y)]))
         print(f"开始切换至账号 {account}")
-        logger.debug(f"[Child Thread]Start switching to account {account}...")
+        logger.info(f"[Child Thread]Start switching to account {account}...")
         with open("./recognition_dataset/recg.json", "r") as f:
             data = json.load(f)
             f.close()
         while True:
-            logger.debug("[Child Thread]Executing image recognition...")
+            logger.info("[Child Thread]Executing image recognition...")
             img = dialog.capture_screen()
             found_match = False  # 用于跟踪是否已经有一次判断成立
             begin_login = False  # 用于跟踪是否开始登录
@@ -156,15 +156,15 @@ class TimerThread(QThread):  # 多线程，用于账号切换
                 # template = cv2.resize(template, (size_x, size_y))
                 result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
                 if result.max() > float(images["threshold"]):
-                    logger.debug("[Child Thread]In threshold: " + images["threshold"])
-                    logger.debug("[Child Thread]" + images["image"] + " matched")
+                    logger.info("[Child Thread]In threshold: " + images["threshold"])
+                    logger.info("[Child Thread]" + images["image"] + " matched")
                     found_match = True
                     taps = images["taps"].split(";")  # 点击的坐标使用分号分隔开
                     for point in taps:
                         if point == "exit":  # 坐标支持特殊项：exit，作用为结束识图步骤，开始输入账号密码
                             begin_login = True
                         elif point == "open_game":
-                            logger.debug("[Child Thread]Starting Arknights...")
+                            logger.info("[Child Thread]Starting Arknights...")
                             run_command(
                                 pre_input + 'monkey -p com.hypergryph.arknights -c android.intent.category.LAUNCHER 1')
                             # 打开!方舟
@@ -174,17 +174,17 @@ class TimerThread(QThread):  # 多线程，用于账号切换
                             time.sleep(t)
                     break
                 # else:
-                #     logger.debug("In threshold: " + images["threshold"])
-                #     logger.debug(images["image"] + " Not matched")
+                #     logger.info("In threshold: " + images["threshold"])
+                #     logger.info(images["image"] + " Not matched")
             if not found_match:
                 # 没找到就返回
                 tap_point(pre_input, 1, 5, size_x, size_y)  # 1！5！
                 run_command(pre_input + 'input keyevent BACK')  # 返回
-                logger.debug("[Child Thread]No match found")
-                logger.debug("[Child Thread]Adb execute back.")
+                logger.info("[Child Thread]No match found")
+                logger.info("[Child Thread]Adb execute back.")
                 time.sleep(t)
             if begin_login:
-                logger.debug("[Child Thread]Start to input account and password.")
+                logger.info("[Child Thread]Start to input account and password.")
                 break
         tap_point(pre_input, 900, 415, size_x, size_y)  # 输入账号
         time.sleep(t)
@@ -199,41 +199,41 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         tap_point(pre_input, 960, 750, size_x, size_y)
         time.sleep(t)
         # 终止adb
-        logger.debug("[Child Thread]Disconnecting adb...")
+        logger.info("[Child Thread]Disconnecting adb...")
         run_command(adb_path + ' disconnect')
         time.sleep(2)
         # print("尝试终止adb ...")
-        # logger.debug("[Child Thread]Killing adb.exe...")  # 似乎不终止adb更好?
+        # logger.info("[Child Thread]Killing adb.exe...")  # 似乎不终止adb更好?
         # popen = os.popen('taskkill /pid adb.exe /f 2>&1').read()
         # print(popen)
         # if popen[:2] == "错误":
         #     print("终止adb失败，用管理员方式打开试试？")
-        #     logger.debug("[Child Thread]Disconnect adb failed")
+        #     logger.info("[Child Thread]Disconnect adb failed")
         # else:
-        #     logger.debug("[Child Thread]Disconnect adb succeeded")
-        logger.debug("[Child Thread]Shutting down RuntimeBroker.exe...")
+        #     logger.info("[Child Thread]Disconnect adb succeeded")
+        logger.info("[Child Thread]Shutting down RuntimeBroker.exe...")
         run_command('taskkill /pid RuntimeBroker.exe /f')
         # 启动MAA
         time.sleep(2)
         print("正在启动MAA")
-        logger.debug("[Child Thread]Starting MAA...")
+        logger.info("[Child Thread]Starting MAA...")
         with open(''.join(str(path) + '\config\gui.json'), 'r', encoding='utf-8') as f:
             data = json.load(f)
             if ''.join(['account', str(group)]) in data['Configurations']:
-                logger.debug("[Child Thread]Custom config found!")
+                logger.info("[Child Thread]Custom config found!")
                 command = ''.join(
                     [str(pathlib.Path(__file__).parent.parent), r"\maa.exe --config ", 'account', str(group)])
-                logger.debug("[Child Thread]Start MAA in config account" + str(group))
+                logger.info("[Child Thread]Start MAA in config account" + str(group))
             elif 'main' in data['Configurations']:
                 command = ''.join([str(pathlib.Path(__file__).parent.parent), r"\maa.exe --config main"])
-                logger.debug("[Child Thread]Start MAA in config main")
+                logger.info("[Child Thread]Start MAA in config main")
             else:
                 command = ''.join([str(pathlib.Path(__file__).parent.parent), r"\maa.exe"])
-                logger.debug("[Child Thread]Start MAA in Default config")
+                logger.info("[Child Thread]Start MAA in Default config")
             subprocess.Popen(command)
             f.close()
         if if_rogue and dialog.rogue_timer.isActive() is False:  # 开启肉鸽定时器
-            logger.debug("[Child Thread]Start Rogue timer!")
+            logger.info("[Child Thread]Start Rogue timer!")
             self.signal_start_rogue.emit()
         with open(''.join([str(pathlib.Path(__file__).parent.parent), r'\MAA.Judge']), "r") as f:
             judge = f.read()
@@ -242,7 +242,7 @@ class TimerThread(QThread):  # 多线程，用于账号切换
             with open(''.join([str(pathlib.Path(__file__).parent.parent), r'\MAA.Judge']), "r") as f:
                 judge = f.read()
                 f.close()
-        logger.debug("[Child Thread]Task Complete")
+        logger.info("[Child Thread]Task Complete")
         is_running = False
 
     def stop(self):
@@ -277,7 +277,7 @@ def tap_point(pre_input, x, y, size_x, size_y):
     x = str(int((x / 1920) * size_x))
     y = str(int((y / 1080) * size_y))
     run_command(pre_input + 'input tap ' + x + " " + y)
-    logger.debug("Tap " + x + " " + y)
+    logger.info("Tap " + x + " " + y)
     return None
 
 
@@ -290,17 +290,17 @@ class InputDialog(QDialog):
     def capture_screen(self, img=None):  # 截图函数，返回模拟器状态
         global adb_path, sim_name, adb_port
         dump_path = ''.join([str(pathlib.Path(__file__).parent), r'\recognition_dataset'])
-        logger.debug("Delete image cache")
+        logger.info("Delete image cache")
         run_command("del " + dump_path + r"\ss.png")
         run_command(
             pre_input + "rm /sdcard/ss.png")
-        logger.debug("Capture image")
+        logger.info("Capture image")
         run_command(
             pre_input + "screencap -p /sdcard/ss.png")
         time.sleep(1)  # adb: error:
         i = 0
         while True:
-            logger.debug("Pulling image to dump path")
+            logger.info("Pulling image to dump path")
             time.sleep(1)
             if sim_name == 'ld':
                 popen = os.popen(
@@ -320,7 +320,7 @@ class InputDialog(QDialog):
             else:
                 popen = os.popen(
                     adb_path + " pull /sdcard/ss.png " + dump_path).read()
-            logger.debug(popen)
+            logger.info(popen)
             if popen.startswith("adb: error:") is False:
                 break
             elif i >= 10:
@@ -331,14 +331,14 @@ class InputDialog(QDialog):
             else:
                 i += 1
                 logger.error(f"Failed to pull image, retrying {i} times")
-        logger.debug("Loading image...")
+        logger.info("Loading image...")
         img = cv2.imread(dump_path + r'\ss.png')
         i = 0
         while img is None or img.size == 0:
             i += 1
             logger.error(f"Loading image failed! Retrying count {i}...")
             img = cv2.imread(dump_path + r'\ss.png')
-            logger.debug(f"Wait {tapdelay}second to load image...")
+            logger.info(f"Wait {tapdelay}second to load image...")
             time.sleep(1)
             if i == 10:
                 logger.error("Reached the maximum retry limit.")
@@ -472,10 +472,10 @@ class InputDialog(QDialog):
             adb_port = '127.0.0.1:5555'
             adb_path = get_process_path('default')
             pre_input = ''.join([adb_path + ' shell '])
-        logger.debug(f"Using simulator: {self.sim_name.currentText()}")
-        logger.debug(f"Set adb path: {adb_path}")
-        logger.debug(f"Set adb port: {adb_port}")
-        logger.debug(f"Using pre input: {pre_input}")
+        logger.info(f"Using simulator: {self.sim_name.currentText()}")
+        logger.info(f"Set adb path: {adb_path}")
+        logger.info(f"Set adb port: {adb_port}")
+        logger.info(f"Using pre input: {pre_input}")
 
         print('设置模拟器为：', self.sim_name.currentText(), '\n'
                                                       'Adb路径：', adb_path)
@@ -731,7 +731,7 @@ class InputDialog(QDialog):
 
     def one_key_btn_command(self):
         global do_count
-        logger.debug("One key timer start!")
+        logger.info("One key timer start!")
         print("一键清理智开始")
         do_count = 0
         with open("info.txt", "r") as f:
@@ -762,7 +762,7 @@ class InputDialog(QDialog):
         self.setWindowTitle(app_name + '：开始运行！')
         with open(''.join([str(pathlib.Path(__file__).parent.parent), r'\MAA.Judge']), "r") as f:
             judge = f.readlines()[-1]
-            logger.debug(f"[One Key Timer]Detect MAA:{judge}")
+            logger.info(f"[One Key Timer]Detect MAA:{judge}")
             print(f'MAA当前状态：{judge}')
             f.close()
         for i in times:
@@ -780,7 +780,7 @@ class InputDialog(QDialog):
                     self.one_key_timer.stop()
 
     def start_command(self):  # 开始按钮
-        logger.debug("Account timer start!")
+        logger.info("Account timer start!")
         print("将执行以下账号：")
         self.save_info()
         self.setWindowTitle(app_name + '：开始运行！')
@@ -790,6 +790,7 @@ class InputDialog(QDialog):
             times = {}  # 创建一个空字典，用于存放时间和对应的数据
             data = json.load(f)  # 加载json格式的数据为字典对象
             i = 0
+            mintime = None
             for group in data:  # 遍历字典中的每一组数据
                 i += 1
                 account = group["account"]
@@ -798,10 +799,8 @@ class InputDialog(QDialog):
                 rogue = group["if_rogue"]
                 rogue_name = group["rogue_name"]  # 0为萨米，1为水月，2为愧影
                 account_switch = group["switch"]
-                if i == 1:
-                    run_command(r'schtasks /create /tn "WakeUp" /tr "C:\Windows\System32\cmd.exe /c ECHO '+'WakeUp'+' & pause" /sc ones /st ' + time)
-                    logger.info(f"Create Windows WakeUp task at time {time}.")
-                    print("根据最早的启动时间新建了Windows唤醒任务！")
+                if mintime == None or datetime.strptime(mintime, "%H:%M") > datetime.strptime(time, "%H:%M"):
+                    mintime = time
                 if account_switch:
                     if rogue_name == 0:
                         rogue_name = "Sami"
@@ -814,6 +813,16 @@ class InputDialog(QDialog):
                             '执行时间：', time, '\n'
                             '是否肉鸽：', rogue, '\n'
                             '打哪个（如果打）：', rogue_name)
+            mintime2 = datetime.strptime(mintime, "%H:%M") + timedelta(hours=12)
+            mintime2 = mintime2.strftime("%H:%M")
+            run_command(r'schtasks /create /tn "WakeUp" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
+                        'WakeUp' +
+                        fr' & pause" /sc once /st {mintime}')
+            run_command(r'schtasks /create /tn "WakeUp2" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
+                        'WakeUp' +
+                        fr' & pause" /sc once /st {mintime2}')
+            logger.info(f"Create Windows WakeUp task at time {mintime}，{mintime2}.")
+            print(f"根据最早的启动时间启动了Windows唤醒任务（{mintime}，{mintime2}）！")
 
         # self.account_timer_thread = TimerThread(times)
         # self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
@@ -829,8 +838,6 @@ class InputDialog(QDialog):
 
     def stop_command(self):  # 停止按钮
         global app_name
-        # self.account_timer = None
-        # self.rogue_timer = None
         self.save_info()
         self.setWindowTitle(app_name)
         if self.account_timer.isActive():
@@ -839,12 +846,13 @@ class InputDialog(QDialog):
             self.rogue_timer.stop()
         try:
             asst.stop()
-            logger.debug("MAA Core stop!")
+            logger.info("MAA Core stop!")
         except:
             pass
-
-        print('停止了所有进行的任务！')
-        logger.debug("All timer stop!")
+        run_command('schtasks /Delete /tn WakeUp /f')
+        run_command('schtasks /Delete /tn WakeUp2 /f')
+        print('停止了所有进行的任务，并关闭了唤醒任务！')
+        logger.info("All timer stop!")
 
     def change_command(self):
         global theme
@@ -868,41 +876,41 @@ class InputDialog(QDialog):
                 times[i] = [account, password]
         current_time = time.strftime('%H:%M')
         if current_time == '04:01':  # 森空岛登录
-            logger.debug("Execute skyland sign.")
+            logger.info("Execute skyland sign.")
             for m in times:
                 try:
-                    logger.debug(f"Sign account:{times.get(m)[0]}")
+                    logger.info(f"Sign account:{times.get(m)[0]}")
                     token = login_by_password(times.get(m)[0], times.get(m)[1])
                     cred = get_cred_by_token(token)
                     print(do_sign(cred))
-                    logger.debug(do_sign(cred))
+                    logger.info(do_sign(cred))
                 except:
                     print_error("森空岛签到失败，请检查网络代理")
                     logger.error("[Sign Timer]Failed to Sign Skyland, maybe the VPN is on?")
 
         if current_time == '03:55':
-            logger.debug("Restarting game...")
+            logger.info("Restarting game...")
             print('临近数据更新时间，重启游戏')
             try:
                 asst.stop()
-                logger.debug("MAA Core stop!")
+                logger.info("MAA Core stop!")
             except:
                 pass
-            logger.debug("Connecting simulator...")
+            logger.info("Connecting simulator...")
             if sim_name == 'bluestacks':
                 run_command(adb_path + ' connect ' + adb_port)
                 run_command(pre_input + 'input su')
             else:
                 run_command(adb_path + ' connect ' + adb_port)
             time.sleep(2)
-            logger.debug("Shutting down Arknights...")
+            logger.info("Shutting down Arknights...")
             run_command(pre_input + 'am force-stop com.hypergryph.arknights')  # 关掉!方舟
             time.sleep(2)
-            logger.debug("Starting Arknights...")
+            logger.info("Starting Arknights...")
             run_command(pre_input + 'monkey -p com.hypergryph.arknights -c android.intent.category.LAUNCHER 1')  # 打开!方舟
             time.sleep(2)
             run_command(adb_path + ' disconnect')
-            logger.debug("Restart complete!")
+            logger.info("Restart complete!")
 
     def execute_command(self, times):  # 换号定时器
         global rogue_name, pre_input, is_running
@@ -942,12 +950,12 @@ class InputDialog(QDialog):
             f.close()
         if judge == "Stop":
             # MAAGui不在运行，开始肉鸽
-            logger.debug("[Rogue Timer]Detected that MAA stop,start rogue.")
-            logger.debug(f"[Rogue Timer]Rogue task:{rogue_name}")
+            logger.info("[Rogue Timer]Detected that MAA stop,start rogue.")
+            logger.info(f"[Rogue Timer]Rogue task:{rogue_name}")
             print('此次肉鸽任务为：', rogue_name)
             # 触控方案配置  请务必设置adbinput！！！！！！！！！！！  # 戳啦，都能用啦（ # 最新消息，minitouch有几率不能用
             if asst.set_instance_option(InstanceOptionType.touch_type, 'adb'):
-                logger.debug("[Rogue Timer]Adb connection successful!")
+                logger.info("[Rogue Timer]Adb connection successful!")
                 print('Adb连接成功！')
             else:
                 logger.error("[Rogue Timer]Adb connection failed, Task stop!")
@@ -983,25 +991,25 @@ class InputDialog(QDialog):
             })
             asst.start()
         else:
-            logger.debug("[Rogue Timer]Detected that MAA is running.")
+            logger.info("[Rogue Timer]Detected that MAA is running.")
             print("如果你的MAA没有在运行的话，可以双击一下文件夹内的MaaIsOff.bat")  # 我实在是想不出有什么好的检测maa是否在运行的方法了
 
 
 if __name__ == '__main__':
     from PyQt5.QtCore import QTimer, QTime
 
-    logger.debug("[--------------------------]")
-    logger.debug("[--Account Changer Start!--]")
-    logger.debug(f"[--Version v{version}         --]")
-    logger.debug(f"[--User Dir {str(pathlib.Path(__file__).parent)} --]")
-    logger.debug("[--------------------------]")
+    logger.info("[--------------------------]")
+    logger.info("[--Account Changer Start!--]")
+    logger.info(f"[--Version v{version}         --]")
+    logger.info(f"[--User Dir {str(pathlib.Path(__file__).parent)} --]")
+    logger.info("[--------------------------]")
 
     '''初始化MAA'''
     path = pathlib.Path(__file__).parent.parent
-    logger.debug(f"Loading MAA path at {str(path)}")
+    logger.info(f"Loading MAA path at {str(path)}")
     Asst.load(path=path)
     asst = Asst()
-    logger.debug(f"Loading MAA succeed!")
+    logger.info(f"Loading MAA succeed!")
 
     app = QApplication(sys.argv)
     qdarktheme.setup_theme('light')
@@ -1012,7 +1020,11 @@ if __name__ == '__main__':
     if if_debug:
         if_debug = False
         ss.deeebuuuggg()
-    logger.debug("GUI Start!")
+
+    logger.info("GUI Start!")
     # adb_path = get_process_path('dnplayer.exe')
     # print('当前Adb路径为：', adb_path)
+    run_command(r'schtasks /create /tn "WakeUp2" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
+                'WakeUp' +
+                fr' & pause" /sc once /st 03:50')
     sys.exit(app.exec_())
