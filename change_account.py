@@ -1024,6 +1024,6 @@ if __name__ == '__main__':
     # adb_path = get_process_path('dnplayer.exe')
     # print('当前Adb路径为：', adb_path)
     run_command(r'schtasks /create /tn "WakeUp2" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
-                'WakeUp' +
+                'WakeUp3' +
                 fr' & pause" /sc once /st 03:50')
     sys.exit(app.exec_())
