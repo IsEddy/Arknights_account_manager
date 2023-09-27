@@ -894,8 +894,7 @@ class InputDialog(QDialog):
             try:
                 asst.stop()
                 logger.info("MAA Core stop!")
-            except:
-                pass
+            except:pass
             logger.info("Connecting simulator...")
             if sim_name == 'bluestacks':
                 run_command(adb_path + ' connect ' + adb_port)
