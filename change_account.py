@@ -42,7 +42,7 @@ pre_input = ''
 tapdelay = 3
 do_count = 0  # 用于一键清日常的计数
 if_debug = False
-version = 0.11
+version = 0.14
 is_running = False
 
 
@@ -817,10 +817,10 @@ class InputDialog(QDialog):
             mintime2 = mintime2.strftime("%H:%M")
             run_command(r'schtasks /create /tn "WakeUp" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
                         'WakeUp' +
-                        fr' & pause" /sc once /st {mintime}')
+                        fr'" /sc once /st {mintime} /f')
             run_command(r'schtasks /create /tn "WakeUp2" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
                         'WakeUp' +
-                        fr' & pause" /sc once /st {mintime2}')
+                        fr'" /sc once /st {mintime2} /f')
             logger.info(f"Create Windows WakeUp task at time {mintime}，{mintime2}.")
             print(f"根据最早的启动时间启动了Windows唤醒任务（{mintime}，{mintime2}）！")
 
@@ -1023,7 +1023,7 @@ if __name__ == '__main__':
     logger.info("GUI Start!")
     # adb_path = get_process_path('dnplayer.exe')
     # print('当前Adb路径为：', adb_path)
-    run_command(r'schtasks /create /tn "WakeUp2" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
-                'WakeUp3' +
-                fr' & pause" /sc once /st 03:50')
+    run_command(r'schtasks /create /tn "WakeUp3" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
+                'WakeUp' +
+                fr'" /sc once /st 03:50 /f')
     sys.exit(app.exec_())
