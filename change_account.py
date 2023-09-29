@@ -120,8 +120,9 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         i = None
         logger.info("[Child Thread]Connecting simulator...")
         print("正在接模拟器")
+        popen = os.popen(''.join([adb_path + ' devices'])).read()  # 有几率出问题？？？
+        logger.debug(popen)
         subprocess.run(''.join([adb_path + ' connect ' + adb_port]), shell=True)
-        popen = os.popen(''.join([adb_path + ' devices']))  # 有几率出问题？？？
         if sim_name == 'bluestacks':
             subprocess.run(''.join([pre_input + 'input su']), shell=True)
         print("成功连接至", dialog.sim_name.currentText())
