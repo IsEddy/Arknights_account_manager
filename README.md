@@ -59,6 +59,7 @@ maa文件夹
 -----------------------------------
 # 致谢
 - 森空岛签到 By xxyz30 https://github.com/xxyz30/skyland-auto-sign (MIT Licence)
+- Logo By QuAn_ https://www.pixiv.net/users/6657532
 
 -----------------------------------
 # 更新日志：
