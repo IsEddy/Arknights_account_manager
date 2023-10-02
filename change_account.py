@@ -913,7 +913,7 @@ class InputDialog(QDialog):
             logger.info("Restart complete!")
 
     def execute_command(self, times):  # 换号定时器
-        global rogue_name, pre_input, is_running
+        global rogue_name, pre_input
         current_time = time.strftime('%H:%M')
         for m in times:
             t1 = m
@@ -922,13 +922,14 @@ class InputDialog(QDialog):
             # print(t1, t2)
             if current_time == t1 or current_time == t2:
                 rogue_name = times.get(m)[3]
-                self.account_timer_thread = TimerThread(
-                    times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4]
-                )
-                self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
-                self.account_timer_thread.signal_start_rogue.connect(self.start_rogue_timer)
                 if is_running is False:
+                    self.account_timer_thread = TimerThread(
+                        times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4]
+                    )
+                    self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
+                    self.account_timer_thread.signal_start_rogue.connect(self.start_rogue_timer)
                     self.account_timer_thread.start()
+                    time.sleep(2)
                 # TimerThread.run(times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4])
 
     # def getInputs(self):
