@@ -929,7 +929,7 @@ class InputDialog(QDialog):
                     self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
                     self.account_timer_thread.signal_start_rogue.connect(self.start_rogue_timer)
                     self.account_timer_thread.start()
-                    time.sleep(2)
+                    time.sleep(2)  # 不可删，删了会异常退出
                 # TimerThread.run(times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4])
 
     # def getInputs(self):
