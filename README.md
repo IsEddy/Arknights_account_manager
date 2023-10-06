@@ -1,4 +1,13 @@
-# 正在找画师要图标授权中...
+
+
+<div align="center">
+<img alt="LOGO" src="https://raw.githubusercontent.com/IsEddy/Arknights_account_manager/master/skadi.ico" width="256" height="256" />
+
+# ArknightsAccountManager
+
+</div>
+
+-----------------------------------
 
 - 本程序适用于有多个```官服```账号而且完全不想管的人
 - 本程序有着许多QianZaiDe迷之bug
@@ -33,7 +42,7 @@ maa文件夹
 - 1. 将MAA的开始前脚本框填上MaaIsOn.bat
 - 2. MAA的结束后脚本框填上MaaIsOff.bat
 - 3. 若是多个账号都使用同一个maa配置：只需再maa中添加“main”配置，并勾选maa的“启动后自动开始任务”选项
-- 3. 若是有账号使用特殊的maa配置：再maa中添加账号相对应的配置，举例：账号1需要使用自定义配置，则在maa中添加名为“account1”的配置，账号2就是“account2”，以此类推。
+- 若是有账号使用特殊的maa配置：再maa中添加账号相对应的配置，举例：账号1需要使用自定义配置，则在maa中添加名为“account1”的配置，账号2就是“account2”，以此类推。
 	
 ## 注意!!!!!仍旧需要勾选maa的“启动后自动开始任务”选项!!!!! 程序会自动检测已经存在的配置并启动，若是该账号不再使用自定义配置，只需删除对应的配置即可。
 
@@ -50,12 +59,13 @@ maa文件夹
 -----------------------------------
 # 致谢
 - 森空岛签到 By xxyz30 https://github.com/xxyz30/skyland-auto-sign (MIT Licence)
+- Logo By QuAn_ https://www.pixiv.net/users/6657532
 
 -----------------------------------
 # 更新日志：
 ## v0.14 :
 - 增加“一键清全部日常”选项
-- 增加在最早启动时前唤醒电脑的功能
+- 增加在最早启动时前唤醒电脑的功能，现在你可以放心的让电脑睡眠啦！
 
 ## v0.13 :
 - 修复多线程无法调起肉鸽的bug

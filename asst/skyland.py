@@ -236,14 +236,14 @@ def do_sign(cred_resp):
         # list_awards(1, i.get('uid'))
         resp = requests.post(sign_url, headers=get_sign_header(sign_url, 'post', body, header), json=body).json()
         if resp['code'] != 0:
-            print(f'角色{i.get("nickName")}({i.get("channelName")})签到失败了！原因：{resp.get("message")}')
+            rtn = f'角色{i.get("nickName")}({i.get("channelName")})签到失败了！原因：{resp.get("message")}'
             continue
         awards = resp['data']['awards']
         for j in awards:
             res = j['resource']
-            print(
-                f'角色{i.get("nickName")}({i.get("channelName")})签到成功，获得了{res["name"]}×{j.get("count") or 1}'
-            )
+            rtn = f'角色{i.get("nickName")}({i.get("channelName")})签到成功，获得了{res["name"]}×{j.get("count") or 1}'
+    return rtn
+
 
 
 def save(token):

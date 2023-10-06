@@ -2,14 +2,13 @@ import os
 import pathlib
 import subprocess
 import sys
-import time
 from datetime import datetime, timedelta
 
 import cv2
 import psutil
 import qdarktheme
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
-from PyQt5.QtGui import QIcon, QFont, QDoubleValidator, QTextCharFormat, QColor, QTextCursor
+from PyQt5.QtGui import QIcon, QFont, QDoubleValidator, QTextCharFormat, QColor
 from PyQt5.QtWidgets import QFormLayout, QDialog, QLineEdit, QTimeEdit, QApplication, QCheckBox, QPushButton, \
     QMessageBox, QComboBox, QPlainTextEdit, QHBoxLayout
 
@@ -90,6 +89,7 @@ class TimerThread(QThread):  # 多线程，用于账号切换
 
     def __init__(self, account, password, if_rogue: bool, group):
         super().__init__()
+        self.is_running = is_running
         self.account = account
         self.password = password
         self.if_rogue = if_rogue
@@ -99,6 +99,8 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         global is_running, adb_path, tapdelay, sim_name, adb_port, pre_input, path
         is_running = True
         logger.info("[Child Thread]Account change thread start!")
+        print(f"执行账号：{self.account}")
+        logger.info(f"[Child Thread]Executing account:{self.account}")
         dialog = InputDialog()
         account = self.account
         password = self.password
@@ -111,8 +113,8 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         logger.info(popen)
         try:
             asst.stop()
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to stop MAA Core: {e}")
         if dialog.rogue_timer.isActive():
             dialog.rogue_timer.stop()
         tapdelay = float(dialog.tapdelay.text())
@@ -120,8 +122,9 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         i = None
         logger.info("[Child Thread]Connecting simulator...")
         print("正在接模拟器")
+        popen = os.popen(''.join([adb_path + ' devices'])).read()  # 有几率出问题？？？
+        logger.debug(popen)
         subprocess.run(''.join([adb_path + ' connect ' + adb_port]), shell=True)
-        popen = os.popen(''.join([adb_path + ' devices']))  # 有几率出问题？？？
         if sim_name == 'bluestacks':
             subprocess.run(''.join([pre_input + 'input su']), shell=True)
         print("成功连接至", dialog.sim_name.currentText())
@@ -130,8 +133,8 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         logger.info("[Child Thread]Killing 自动精灵...")
         try:
             subprocess.run(''.join([pre_input, 'am force-stop com.zdanjian.zdanjian']), shell=True)  # 关闭自动精灵(你可以用自动精灵，不会出事)
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"[Child Thread]Failed to kill 自动精灵：{e}")
         time.sleep(2)
         size = os.popen(pre_input + 'wm size').read()
         size = size[size.find(":") + 2:]
@@ -351,6 +354,7 @@ class InputDialog(QDialog):
         # if result.max() > 0.8:
         #     return '位于开始页'
 
+    # noinspection PyUnresolvedReferences
     def __init__(self):
         global app_name, adb_path
 
@@ -456,8 +460,8 @@ class InputDialog(QDialog):
             sim_name = 'bluestacks'
             try:
                 adb_port = Bluestacks.get_hyperv_port(r"C:\ProgramData\BlueStacks_nxt\bluestacks.conf", "Pie64_1")
-            except:
-                logger.error('Failed to get bluestacks adb port')
+            except Exception as e:
+                logger.error(f'Failed to get bluestacks adb port: {e}')
                 print_error("获取蓝叠模拟器adb端口失败！")
                 adb_port = '127.0.0.1:5555'
             adb_path = get_process_path('HD-Player.exe')
@@ -770,7 +774,6 @@ class InputDialog(QDialog):
                 timer_thread = TimerThread(times[i][0], times[i][1], times[i][2], times[i][3])
                 if is_running is False:
                     do_count += 1
-                    print(f"执行账号：{times[i][0]}!")
                     timer_thread.start()
                 time.sleep(2)
 
@@ -847,8 +850,8 @@ class InputDialog(QDialog):
         try:
             asst.stop()
             logger.info("MAA Core stop!")
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to stop MAA Core: {e}")
         run_command('schtasks /Delete /tn WakeUp /f')
         run_command('schtasks /Delete /tn WakeUp2 /f')
         print('停止了所有进行的任务，并关闭了唤醒任务！')
@@ -884,8 +887,9 @@ class InputDialog(QDialog):
                     cred = get_cred_by_token(token)
                     print(do_sign(cred))
                     logger.info(do_sign(cred))
-                except:
+                except Exception as e:
                     print_error("森空岛签到失败，请检查网络代理")
+                    logger.error(f"[Sign Timer]{e}")
                     logger.error("[Sign Timer]Failed to Sign Skyland, maybe the VPN is on?")
 
         if current_time == '03:55':
@@ -894,7 +898,8 @@ class InputDialog(QDialog):
             try:
                 asst.stop()
                 logger.info("MAA Core stop!")
-            except:pass
+            except Exception as e:
+                logger.error(f"Failed to stop MAA Core: {e}")
             logger.info("Connecting simulator...")
             if sim_name == 'bluestacks':
                 run_command(adb_path + ' connect ' + adb_port)
@@ -912,7 +917,7 @@ class InputDialog(QDialog):
             logger.info("Restart complete!")
 
     def execute_command(self, times):  # 换号定时器
-        global rogue_name, pre_input, is_running
+        global rogue_name, pre_input
         current_time = time.strftime('%H:%M')
         for m in times:
             t1 = m
@@ -921,13 +926,14 @@ class InputDialog(QDialog):
             # print(t1, t2)
             if current_time == t1 or current_time == t2:
                 rogue_name = times.get(m)[3]
-                self.account_timer_thread = TimerThread(
-                    times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4]
-                )
-                self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
-                self.account_timer_thread.signal_start_rogue.connect(self.start_rogue_timer)
                 if is_running is False:
+                    self.account_timer_thread = TimerThread(
+                        times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4]
+                    )
+                    self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
+                    self.account_timer_thread.signal_start_rogue.connect(self.start_rogue_timer)
                     self.account_timer_thread.start()
+                    while is_running is False:pass
                 # TimerThread.run(times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4])
 
     # def getInputs(self):
@@ -965,8 +971,8 @@ class InputDialog(QDialog):
                     self.rogue_timer.stop()
                 else:
                     print("肉鸽定时器异常")
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"[Rogue Timer]Failed to stop Rogue Timer: {e}")
             asst.connect(adb_path, '127.0.0.1:5555', 'CapWithShell')
             asst.append_task('Roguelike', {
                 "theme": rogue_name,  # 肉鸽名，可选，默认 "Phantom"
