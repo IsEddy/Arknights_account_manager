@@ -1,5 +1,7 @@
+import json
 import os
 import pathlib
+import platform
 import subprocess
 import sys
 from datetime import datetime, timedelta
@@ -10,7 +12,7 @@ import qdarktheme
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QIcon, QFont, QDoubleValidator, QTextCharFormat, QColor
 from PyQt5.QtWidgets import QFormLayout, QDialog, QLineEdit, QTimeEdit, QApplication, QCheckBox, QPushButton, \
-    QMessageBox, QComboBox, QPlainTextEdit, QHBoxLayout
+    QMessageBox, QComboBox, QPlainTextEdit, QHBoxLayout, QInputDialog
 
 from asst.asst import Asst
 from asst.emulator import Bluestacks  # MAA的集成，用于获取蓝叠的adbport
@@ -30,7 +32,6 @@ logger.addHandler(console_handler)
 
 
 group_count = 1
-theme = 'light'
 app_name = '斯卡蒂账号小助手'  # 程序名
 sim_name = 'ld'  # 什么模拟器
 sleeptime = 60  # 多少s检测一次时间
@@ -38,12 +39,32 @@ rogue_name = 'Sami'
 adb_path = ''
 adb_port = ''
 pre_input = ''
-tapdelay = 3
 do_count = 0  # 用于一键清日常的计数
-if_debug = False
 version = 0.14
 is_running = False
 
+try:
+    with open("info.json", "r") as f:
+        theme = json.load(f)["Settings"]["Theme"]
+except:
+    theme = "light"
+try:
+    with open("info.json", "r") as f:
+        tapdelay = json.load(f)["Settings"]["TapDelay"]
+except:
+    tapdelay = 3
+
+try:
+    with open("info.json", "r") as f:
+        if_debug = json.load(f)["Settings"]["Debug"]
+except:
+    if_debug = False
+
+try:
+    with open("info.json", "r") as f:
+        pwd = json.load(f)["Settings"]["Password"]
+except:
+    pwd = None
 
 class PrintOutput(QPlainTextEdit):  # print重写
     def __init__(self, parent=None):
@@ -81,6 +102,36 @@ def print_error(*args, **kwargs):
     print(*args, **kwargs)
     # Reset is_error attribute to False
     kwargs['file'].is_error = False
+
+
+def get_data():
+    with open("info.json", "r") as f:
+        data = []
+        data_temp = json.load(f)["Accounts"]
+        for item in data_temp:
+            data.append(data_temp[item])
+    return data
+
+
+def set_win_task(wake_time, name, pwd):
+    username = fr"{platform.node()}\{os.getlogin()}"
+
+    with open('./asst/wake.xml', 'r', encoding="UTF-16") as template_file:
+        xml_template = template_file.read()
+
+    updated_xml = xml_template.replace('<StartBoundary>2023-10-05T16:10:00</StartBoundary>',
+                                       f'<StartBoundary>2023-10-05T{wake_time}:00</StartBoundary>')
+    updated_xml = updated_xml.replace('<URI>\test</URI>', fr'<URI>\{name}</URI>')
+    updated_xml = updated_xml.replace('<UserId>UserName</UserId>', fr'<UserId>{username}</UserId>')
+
+    with open('temp_task.xml', 'w') as temp_xml_file:
+        temp_xml_file.write(updated_xml)
+    commands = fr'schtasks /create /xml "{str(pathlib.Path(__file__).parent)}\temp_task.xml" /tn "{name}" /f /ru "{username}" /rp "{pwd}"'
+    run_command(commands)
+    logger.info(f"Set wakeup task {name} at {wake_time}")
+    time.sleep(1)
+    os.remove('temp_task.xml')
+
 
 
 class TimerThread(QThread):  # 多线程，用于账号切换
@@ -356,7 +407,7 @@ class InputDialog(QDialog):
 
     # noinspection PyUnresolvedReferences
     def __init__(self):
-        global app_name, adb_path
+        global app_name, adb_path, pwd
 
         super().__init__()
         main_layout = QHBoxLayout(self)
@@ -387,7 +438,7 @@ class InputDialog(QDialog):
         self.one_key.clicked.connect(self.one_key_btn_command)
 
         self.tapdelay = QLineEdit()
-        self.tapdelay.setText("3")
+        self.tapdelay.setText(str(tapdelay))
         self.cpdtext = "输入合适的点击后置延时"
 
         validator = QDoubleValidator(self)
@@ -424,6 +475,20 @@ class InputDialog(QDialog):
 
         self.rogue_timer = QTimer(self)
         self.account_timer = QTimer(self)
+
+        if pwd is None:
+            pwd, ok = QInputDialog.getText(self, '输入密码', '首次启动请输入你电脑的”登陆密码“（不是pin！！！），\n密码仅用于创建唤醒任务，且只会保存在本地，\n以便您可以放心的让电脑睡眠：\n')
+            if ok and pwd != "":
+                set_win_task("03:50", "WakeUp3", pwd)
+            else:
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Question)
+                msg.setWindowTitle("提示")
+                msg.setText("好吧b（￣▽￣）d　不输也没关系 \n 只是如果你的电脑进入睡眠模式了脚本就不起作用了哦")
+                msg.exec_()
+        else:
+            set_win_task("03:50", "WakeUp3", pwd)
+        self.save_info()
 
     def redirect_print_to_widget(self):
         sys.stdout = self.output_text_edit
@@ -500,6 +565,7 @@ class InputDialog(QDialog):
             if_debug = False
             sleeptime = 60
             print(f"检测时间调整为{sleeptime}，密码已隐藏，debug模式关闭")
+        self.save_info()
 
     def add_input(self):
         global group_count
@@ -523,9 +589,12 @@ class InputDialog(QDialog):
         self.inputs.append(input_group)
         self.save_info()  # 保存info.txt文件中的数据
 
-        with open("info.txt", "r") as f:
 
-            data = json.load(f)  # 加载json格式的数据为字典对象
+        with open("info.json", "r") as f:
+            data = []
+            data_temp = json.load(f)["Accounts"]
+            for item in data_temp:  # 遍历每个项，检查并添加缺失的键值
+                data.append(data_temp[item])
             for group in data:
                 # print(group["group"])
                 if group["group"] == group_count:
@@ -566,6 +635,7 @@ class InputDialog(QDialog):
                     self.form.addRow(account_edit, password_edit)
                     self.form.addRow(time_lable, time_edit)
                     self.form.addRow(if_rogue, rogue_name)
+
         self.form.addRow(self.start_btn, self.add_button)
         self.form.addRow(self.stop_btn, self.del_button)
         self.form.addRow(self.change_btn, self.rogue_btn)
@@ -575,7 +645,7 @@ class InputDialog(QDialog):
         group_count += 1
 
     def del_input(self):
-        global group_count
+        global group_count, theme, tapdelay
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Question)
         msg.setWindowTitle("删除账号")
@@ -584,14 +654,15 @@ class InputDialog(QDialog):
         choice = msg.exec_()
         if choice == QMessageBox.Yes:
             group_count -= 2
-            with open("info.txt", "r+") as f:
-                data = json.load(f)
-                if data:
-                    data.pop()  # 如果列表不为空，删除最后一个元素
-                f.truncate(0)
-                f.seek(0)
-                json.dump(data, f, indent=4)  # 清空文件并写入
-                f.close()
+            with open("info.json", "r") as f:
+                data = json.load(f)["Accounts"]
+            if data:
+                data.popitem()  # 如果列表不为空，删除最后一个元素
+            tapdelay = self.tapdelay.text()
+            settings = {"Theme": theme, "TapDelay" : tapdelay, "Debug" : if_debug, "Password" : pwd}
+            data = {"Accounts": data, "Settings": settings}
+            with open("info.json", "w") as f:
+                json.dump(data, f, indent=4)
             group_count += 1
             exe_path = sys.executable
             # 暂停一段时间，确保当前进程结束
@@ -601,57 +672,43 @@ class InputDialog(QDialog):
 
     def load_info(self):
         global group_count
-        # 加载info.txt文件中的数据的函数
-        if os.path.exists("info.txt"):  # 如果之前保存了
-            default_values = {  # json所有键以及默认键值
-                "group": 1,
-                "account": "",
-                "password": "",
-                "time": "00:00",
-                "if_rogue": False,
-                "rogue_name": 0,
-                "switch": True
-            }
-            with open("info.txt", "r") as f:
-                self.inputs = []
-                data = json.load(f)
-                for item in data:  # 遍历每个项，检查并添加缺失的键值
-                    for key, value in default_values.items():
-                        if key not in item:
-                            item[key] = value
-                for group in data:
-                    account = group["account"]  # 获取数据
-                    password = group["password"]
-                    time = group["time"]
-                    rogue = bool(group["if_rogue"])
-                    rogue_number = group["rogue_name"]  # 0为萨米，1为水月，2为愧影
-                    account_switch = group["switch"]
-                    account_edit = QLineEdit(self)
-                    account_edit.setText(account)
-                    password_edit = QLineEdit(self)
-                    password_edit.setEchoMode(QLineEdit.Password)
-                    password_edit.setText(password)
-                    time_edit = QTimeEdit(self)
-                    time_edit.setTime(QTime(int(time[0:2]), int(time[3:5])))
-                    time_edit.setDisplayFormat('HH:mm')
-                    time_edit.setCalendarPopup(True)
-                    if_rogue = QCheckBox(self)
-                    if_rogue.setText('任务完毕后打肉鸽')
-                    if_rogue.setChecked(rogue)
-                    if_rogue.clicked.connect(self.switch_btn_command)
-                    rogue_name = QComboBox(self)
-                    rogue_name.addItems(['萨米', '水月', '傀影'])
-                    rogue_name.setCurrentIndex(rogue_number)
-                    switch = SwitchBtn()
-                    switch.setOnText("账号已开启！")
-                    switch.setOffText("账号已关闭！")
-                    switch.clicked.connect(self.switch_btn_command)
-                    switch.setChecked(account_switch)
+        # 加载info.json文件中的数据的函数
+        if os.path.exists("info.json"):  # 如果之前保存了
+            self.inputs = []
+            data = get_data()
+            for group in data:
+                account = group["account"]  # 获取数据
+                password = group["password"]
+                time = group["time"]
+                rogue = bool(group["if_rogue"])
+                rogue_number = group["rogue_name"]  # 0为萨米，1为水月，2为愧影
+                account_switch = group["switch"]
+                account_edit = QLineEdit(self)
+                account_edit.setText(account)
+                password_edit = QLineEdit(self)
+                password_edit.setEchoMode(QLineEdit.Password)
+                password_edit.setText(password)
+                time_edit = QTimeEdit(self)
+                time_edit.setTime(QTime(int(time[0:2]), int(time[3:5])))
+                time_edit.setDisplayFormat('HH:mm')
+                time_edit.setCalendarPopup(True)
+                if_rogue = QCheckBox(self)
+                if_rogue.setText('任务完毕后打肉鸽')
+                if_rogue.setChecked(rogue)
+                if_rogue.clicked.connect(self.switch_btn_command)
+                rogue_name = QComboBox(self)
+                rogue_name.addItems(['萨米', '水月', '傀影'])
+                rogue_name.setCurrentIndex(rogue_number)
+                switch = SwitchBtn()
+                switch.setOnText("账号已开启！")
+                switch.setOffText("账号已关闭！")
+                switch.clicked.connect(self.switch_btn_command)
+                switch.setChecked(account_switch)
 
-                    input_group = (
-                        account_edit, password_edit, time_edit, if_rogue, rogue_name, switch)  # 将一组输入框打包为一个元组
-                    self.inputs.append(input_group)  # 将一组输入框添加到列表中
-                    group_count += 1
+                input_group = (
+                    account_edit, password_edit, time_edit, if_rogue, rogue_name, switch)  # 将一组输入框打包为一个元组
+                self.inputs.append(input_group)  # 将一组输入框添加到列表中
+                group_count += 1
 
         else:  # 如果第一次打开
             group_count = len(self.inputs) + 1  # 计算当前输入框的组数
@@ -677,13 +734,13 @@ class InputDialog(QDialog):
             self.inputs.append(input_group)  # 将一组输入框添加到列表中
 
         self.showshow()
-        self.save_info()
 
     def save_info(self):
         global group_count
         # 保存info.txt文件中的数据的函数
+        logger.info("Information saved!")
         group_count = 0
-        data = []  # 创建一个空列表用于存储数据
+        data = {}  # 创建一个json用于存储数据
         for i, input_group in enumerate(self.inputs):  # 遍历列表中的每一组输入框
             group_count += 1
             account_edit = input_group[0]  # 获取数据
@@ -700,9 +757,13 @@ class InputDialog(QDialog):
             account_switch = switch.isChecked()
             group_data = {"group": group_count, "account": account, "password": password, "time": time,
                           "if_rogue": if_rogue, "rogue_name": rogue_name, "switch": account_switch}  # 将一组数据打包为一个字典对象
-            data.append(group_data)  # 将一组数据添加到列表中
+            group_data = {f"account{group_count}" : group_data}
+            data.update(group_data)  # 将一组数据添加到列表中
+        tapdelay = self.tapdelay.text()
+        settings = {"Theme": theme, "TapDelay" : tapdelay, "Debug" : if_debug, "Password" : pwd}
+        data = {"Accounts" : data, "Settings" : settings}
 
-        with open("info.txt", "w") as f:
+        with open("info.json", "w") as f:
             json.dump(data, f, indent=4)
 
     def showshow(self):  # 显示函数
@@ -738,32 +799,24 @@ class InputDialog(QDialog):
         logger.info("One key timer start!")
         print("一键清理智开始")
         do_count = 0
-        with open("info.txt", "r") as f:
-            times = {}
-            data = json.load(f)  # 加载json格式的数据为字典对象
-            i = 0
-            for group in data:  # 遍历字典中的每一组数据
-                account = group["account"]
-                password = group["password"]
-                rogue_name = group["rogue_name"]  # 0为萨米，1为水月，2为愧影
-                account_switch = group["switch"]
-                if account_switch:
-                    i += 1
-                    if rogue_name == 0:
-                        rogue_name = "Sami"
-                    elif rogue_name == 1:
-                        rogue_name = "Mizuki"
-                    elif rogue_name == 2:
-                        rogue_name = "Phantom"
-                    times[i] = [account, password, False, group["group"]]
+        data = get_data()
+        times = {}
+        i = 0
+        for group in data:  # 遍历字典中的每一组数据
+            account = group["account"]
+            password = group["password"]
+            account_switch = group["switch"]
+            if account_switch:
+                i += 1
+                times[i] = [account, password, False, group["group"]]
+        self.save_info()
+        self.setWindowTitle(app_name + '：开始运行！')
         self.one_key_timer = QTimer(self)
         self.one_key_timer.timeout.connect(lambda: self.one_key_command(times))
         self.one_key_timer.start(sleeptime * 1000)
 
     def one_key_command(self, times):
         global do_count, group_count
-        self.save_info()
-        self.setWindowTitle(app_name + '：开始运行！')
         with open(''.join([str(pathlib.Path(__file__).parent.parent), r'\MAA.Judge']), "r") as f:
             judge = f.readlines()[-1]
             logger.info(f"[One Key Timer]Detect MAA:{judge}")
@@ -789,43 +842,42 @@ class InputDialog(QDialog):
         self.setWindowTitle(app_name + '：开始运行！')
         if self.account_timer.isActive():
             self.account_timer.stop()
-        with open("info.txt", "r") as f:
-            times = {}  # 创建一个空字典，用于存放时间和对应的数据
-            data = json.load(f)  # 加载json格式的数据为字典对象
-            i = 0
-            mintime = None
-            for group in data:  # 遍历字典中的每一组数据
-                i += 1
-                account = group["account"]
-                password = group["password"]
-                time = group["time"]
-                rogue = group["if_rogue"]
-                rogue_name = group["rogue_name"]  # 0为萨米，1为水月，2为愧影
-                account_switch = group["switch"]
-                if mintime == None or datetime.strptime(mintime, "%H:%M") > datetime.strptime(time, "%H:%M"):
-                    mintime = time
-                if account_switch:
-                    if rogue_name == 0:
-                        rogue_name = "Sami"
-                    elif rogue_name == 1:
-                        rogue_name = "Mizuki"
-                    elif rogue_name == 2:
-                        rogue_name = "Phantom"
-                    times[time] = [account, password, rogue, rogue_name, i]
-                    print(f'第{i}组账号：', account, '\n'
-                            '执行时间：', time, '\n'
-                            '是否肉鸽：', rogue, '\n'
-                            '打哪个（如果打）：', rogue_name)
-            mintime2 = datetime.strptime(mintime, "%H:%M") + timedelta(hours=12)
-            mintime2 = mintime2.strftime("%H:%M")
-            run_command(r'schtasks /create /tn "WakeUp" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
-                        'WakeUp' +
-                        fr'" /sc once /st {mintime} /f')
-            run_command(r'schtasks /create /tn "WakeUp2" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
-                        'WakeUp' +
-                        fr'" /sc once /st {mintime2} /f')
-            logger.info(f"Create Windows WakeUp task at time {mintime}，{mintime2}.")
-            print(f"根据最早的启动时间启动了Windows唤醒任务（{mintime}，{mintime2}）！")
+        data = get_data()
+        times = {}
+        i = 0
+        mintime = None
+        for group in data:  # 遍历字典中的每一组数据
+            i += 1
+            account = group["account"]
+            password = group["password"]
+            time = group["time"]
+            rogue = group["if_rogue"]
+            rogue_name = group["rogue_name"]  # 0为萨米，1为水月，2为愧影
+            account_switch = group["switch"]
+            if mintime == None or datetime.strptime(mintime, "%H:%M") > datetime.strptime(time, "%H:%M"):
+                mintime = time
+            if account_switch:
+                if rogue_name == 0:
+                    rogue_name = "Sami"
+                elif rogue_name == 1:
+                    rogue_name = "Mizuki"
+                elif rogue_name == 2:
+                    rogue_name = "Phantom"
+                times[time] = [account, password, rogue, rogue_name, i]
+                print(f'第{i}组账号：', account, '\n'
+                        '执行时间：', time, '\n'
+                        '是否肉鸽：', rogue, '\n'
+                        '打哪个（如果打）：', rogue_name)
+        mintime2 = datetime.strptime(mintime, "%H:%M") + timedelta(hours=12)
+        mintime2 = mintime2.strftime("%H:%M")
+        run_command(r'schtasks /create /tn "WakeUp" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
+                    'WakeUp' +
+                    fr'" /sc once /st {mintime} /f')
+        run_command(r'schtasks /create /tn "WakeUp2" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
+                    'WakeUp' +
+                    fr'" /sc once /st {mintime2} /f')
+        logger.info(f"Create Windows WakeUp task at time {mintime}，{mintime2}.")
+        print(f"根据最早的启动时间启动了Windows唤醒任务（{mintime}，{mintime2}）！")
 
         # self.account_timer_thread = TimerThread(times)
         # self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
@@ -865,18 +917,18 @@ class InputDialog(QDialog):
         else:
             qdarktheme.setup_theme('light')
             theme = 'light'
+        self.save_info()
 
     def skyland_sign(self):  # 签到定时器
         global adb_path, adb_port, pre_input
-        with open("info.txt", "r") as f:
-            times = {}  # 创建一个空字典，用于存放时间和对应的数据
-            data = json.load(f)  # 加载json格式的数据为字典对象
-            i = 0
-            for group in data:  # 遍历字典中的每一组数据
-                i += 1
-                account = group["account"]
-                password = group["password"]
-                times[i] = [account, password]
+        data = get_data()
+        times = {}  # 创建一个空字典，用于存放时间和对应的数据
+        i = 0
+        for group in data:  # 遍历字典中的每一组数据
+            i += 1
+            account = group["account"]
+            password = group["password"]
+            times[i] = [account, password]
         current_time = time.strftime('%H:%M')
         if current_time == '04:01':  # 森空岛登录
             logger.info("Execute skyland sign.")
@@ -1017,7 +1069,7 @@ if __name__ == '__main__':
     logger.info(f"Loading MAA succeed!")
 
     app = QApplication(sys.argv)
-    qdarktheme.setup_theme('light')
+    qdarktheme.setup_theme(theme)
     ss = InputDialog()
     ss.show()
     ss.redirect_print_to_widget()
@@ -1029,7 +1081,4 @@ if __name__ == '__main__':
     logger.info("GUI Start!")
     # adb_path = get_process_path('dnplayer.exe')
     # print('当前Adb路径为：', adb_path)
-    run_command(r'schtasks /create /tn "WakeUp3" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
-                'WakeUp' +
-                fr'" /sc once /st 03:50 /f')
     sys.exit(app.exec_())
