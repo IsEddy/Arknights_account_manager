@@ -845,7 +845,7 @@ class InputDialog(QDialog):
         data = get_data()
         times = {}
         i = 0
-        mintime = None
+        minitime = None
         for group in data:  # 遍历字典中的每一组数据
             i += 1
             account = group["account"]
@@ -854,8 +854,8 @@ class InputDialog(QDialog):
             rogue = group["if_rogue"]
             rogue_name = group["rogue_name"]  # 0为萨米，1为水月，2为愧影
             account_switch = group["switch"]
-            if mintime == None or datetime.strptime(mintime, "%H:%M") > datetime.strptime(time, "%H:%M"):
-                mintime = time
+            if minitime == None or datetime.strptime(minitime, "%H:%M") > datetime.strptime(time, "%H:%M"):
+                minitime = time
             if account_switch:
                 if rogue_name == 0:
                     rogue_name = "Sami"
@@ -868,16 +868,17 @@ class InputDialog(QDialog):
                         '执行时间：', time, '\n'
                         '是否肉鸽：', rogue, '\n'
                         '打哪个（如果打）：', rogue_name)
-        mintime2 = datetime.strptime(mintime, "%H:%M") + timedelta(hours=12)
-        mintime2 = mintime2.strftime("%H:%M")
-        run_command(r'schtasks /create /tn "WakeUp" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
-                    'WakeUp' +
-                    fr'" /sc once /st {mintime} /f')
-        run_command(r'schtasks /create /tn "WakeUp2" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
-                    'WakeUp' +
-                    fr'" /sc once /st {mintime2} /f')
-        logger.info(f"Create Windows WakeUp task at time {mintime}，{mintime2}.")
-        print(f"根据最早的启动时间启动了Windows唤醒任务（{mintime}，{mintime2}）！")
+        minitime2 = datetime.strptime(minitime, "%H:%M") + timedelta(hours=12)
+        minitime2 = minitime2.strftime("%H:%M")
+        set_win_task(minitime, 'WakeUp', pwd)
+        set_win_task(minitime2, 'WakeUp2', pwd)
+        # run_command(r'schtasks /create /tn "WakeUp" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
+        #             'WakeUp' +
+        #             fr'" /sc once /st {minItime} /f')
+        # run_command(r'schtasks /create /tn "WakeUp2" /tr "C:\Windows\System32\cmd.exe /c ECHO ' +
+        #             'WakeUp' +
+        #             fr'" /sc once /st {minItime2} /f')
+        print(f"根据最早的启动时间启动了Windows唤醒任务（{minitime}，{minitime2}）！")
 
         # self.account_timer_thread = TimerThread(times)
         # self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
