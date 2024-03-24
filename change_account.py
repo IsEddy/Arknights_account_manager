@@ -1,4 +1,5 @@
 import json
+import time
 import os
 import pathlib
 import platform
@@ -33,7 +34,6 @@ logger.addHandler(console_handler)
 
 group_count = 1
 app_name = '斯卡蒂账号小助手'  # 程序名
-sim_name = 'ld'  # 什么模拟器
 sleeptime = 60  # 多少s检测一次时间
 rogue_name = 'Sami'
 adb_path = ''
@@ -65,6 +65,12 @@ try:
         pwd = json.load(f)["Settings"]["Password"]
 except:
     pwd = None
+
+try:
+    with open("info.json", "r") as f:
+        sim_name = json.load(f)["Settings"]["Simulator"]
+except:
+    sim_name = 'ld'  # 什么模拟器
 
 class PrintOutput(QPlainTextEdit):  # print重写
     def __init__(self, parent=None):
@@ -449,6 +455,18 @@ class InputDialog(QDialog):
 
         self.sim_name = QComboBox(self)
         self.sim_name.addItems(['雷电模拟器', 'MuMu 模拟器', 'MuMu 模拟器 12', '蓝叠模拟器', '夜神模拟器', '通用模式'])
+        if sim_name == 'ld':
+            self.sim_name.setCurrentIndex(0)
+        elif sim_name == 'mumu':
+            self.sim_name.setCurrentIndex(1)
+        elif sim_name == 'mumu12':
+            self.sim_name.setCurrentIndex(2)
+        elif sim_name == 'bluestacks':
+            self.sim_name.setCurrentIndex(3)
+        elif sim_name == 'nox':
+            self.sim_name.setCurrentIndex(4)
+        elif sim_name == 'default':
+            self.sim_name.setCurrentIndex(5)
         self.sim_name.currentIndexChanged.connect(self.change_adb_path)
 
         self.setWindowFlag(Qt.CustomizeWindowHint)
@@ -534,7 +552,7 @@ class InputDialog(QDialog):
         elif self.sim_name.currentText() == '夜神模拟器':
             sim_name = 'nox'
             adb_port = '127.0.0.1:62001'
-            adb_path = get_process_path('nox.exe')
+            adb_path = get_process_path('Nox.exe')
             pre_input = ''.join([adb_path + ' shell '])
         elif self.sim_name.currentText() == '通用模式':
             sim_name = 'default'
@@ -548,6 +566,7 @@ class InputDialog(QDialog):
 
         print('设置模拟器为：', self.sim_name.currentText(), '\n'
                                                       'Adb路径：', adb_path)
+        self.save_info()
 
     def deeebuuuggg(self):
         global sleeptime, if_debug
@@ -659,7 +678,7 @@ class InputDialog(QDialog):
             if data:
                 data.popitem()  # 如果列表不为空，删除最后一个元素
             tapdelay = self.tapdelay.text()
-            settings = {"Theme": theme, "TapDelay" : tapdelay, "Debug" : if_debug, "Password" : pwd}
+            settings = {"Theme": theme, "TapDelay" : tapdelay, "Debug" : if_debug, "Password" : pwd, "Simulator" :sim_name}
             data = {"Accounts": data, "Settings": settings}
             with open("info.json", "w") as f:
                 json.dump(data, f, indent=4)
@@ -760,7 +779,7 @@ class InputDialog(QDialog):
             group_data = {f"account{group_count}" : group_data}
             data.update(group_data)  # 将一组数据添加到列表中
         tapdelay = self.tapdelay.text()
-        settings = {"Theme": theme, "TapDelay" : tapdelay, "Debug" : if_debug, "Password" : pwd}
+        settings = {"Theme": theme, "TapDelay" : tapdelay, "Debug" : if_debug, "Password" : pwd, "Simulator" :sim_name}
         data = {"Accounts" : data, "Settings" : settings}
 
         with open("info.json", "w") as f:
@@ -829,7 +848,6 @@ class InputDialog(QDialog):
                     do_count += 1
                     timer_thread.start()
                 time.sleep(2)
-
                 if do_count == group_count:
                     logger.info("[One Key Timer]All account complete!")
                     print("所有账号执行完毕！")
@@ -1064,6 +1082,12 @@ if __name__ == '__main__':
 
     '''初始化MAA'''
     path = pathlib.Path(__file__).parent.parent
+    while os.path.isfile(''.join([str(path), "/MaaCore.dll"])) is False:
+        path = pathlib.Path(path).parent
+        time.sleep(1)
+        if len(str(path)) == 3:
+            logger.error("Loading MAA failed, exiting...")
+            os._exit(0)
     logger.info(f"Loading MAA path at {str(path)}")
     Asst.load(path=path)
     asst = Asst()
