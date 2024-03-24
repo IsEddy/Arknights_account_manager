@@ -535,9 +535,12 @@ class InputDialog(QDialog):
             sim_name = 'mumu12'
             adb_path = get_process_path('MuMuPlayer.exe')
             if adb_path[:1] == '"':
-                adb_port = subprocess.Popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe" adb -v 0', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                process = subprocess.Popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe" adb -v 0', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             else:
-                adb_port = subprocess.Popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe adb -v 0', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                process = subprocess.Popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe adb -v 0', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            adb_port, stderr = process.communicate()
+            adb_port = str(adb_port)[2:-1]
+            logger.info(adb_port)
             if adb_port == '':
                 logger.error('Failed to get mumu12 adb port')
                 print_error("获取mumu12模拟器adb端口失败！")
