@@ -195,8 +195,12 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         time.sleep(2)
         size = os.popen(pre_input + 'wm size').read()
         size = size[size.find(":") + 2:]
-        size_x = int(size[:  size.find("x")])
-        size_y = int(size[size.find("x") + 1:])
+        if sim_name == 'mumu' or sim_name == 'mumu12':
+            size_y = int(size[:  size.find("x")])
+            size_x = int(size[size.find("x") + 1:])  # mumu模拟器的分辨率是反过来的
+        else:
+            size_x = int(size[:  size.find("x")])
+            size_y = int(size[size.find("x") + 1:])
         print('当前分辨率：' + ''.join([str(size_x), "x", str(size_y)]))
         logger.info('[Child Thread]Current resolution：' + ''.join([str(size_x), "x", str(size_y)]))
         print(f"开始切换至账号 {account}")
@@ -372,7 +376,7 @@ class InputDialog(QDialog):
                 popen = os.popen(
                     adb_path + " pull /sdcard/ss.png " + dump_path).read()
             elif sim_name == 'mumu12':
-                popen = sos.popen(
+                popen = os.popen(
                     adb_path + " pull /sdcard/ss.png " + dump_path).read()
             elif sim_name == 'bluestacks':
                 popen = os.popen(
@@ -531,9 +535,9 @@ class InputDialog(QDialog):
             sim_name = 'mumu12'
             adb_path = get_process_path('MuMuPlayer.exe')
             if adb_path[:1] == '"':
-                adb_port = os.popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe" adb -v 0').read()
+                adb_port = subprocess.Popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe" adb -v 0', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             else:
-                adb_port = os.popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe adb -v 0').read()
+                adb_port = subprocess.Popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe adb -v 0', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if adb_port == '':
                 logger.error('Failed to get mumu12 adb port')
                 print_error("获取mumu12模拟器adb端口失败！")
