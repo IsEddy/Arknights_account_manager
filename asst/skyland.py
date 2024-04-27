@@ -108,7 +108,8 @@ def generate_signature(token: str, path, body_or_query):
     :param body_or_query: 如果是GET，则是它的query。POST则为它的body
     :return: 计算完毕的sign
     """
-    t = str(int(time.time()))
+    # 总是说请勿修改设备时间，怕不是yj你的服务器有问题吧，所以这里特地-2
+    t = str(int(time.time()) - 2)
     token = token.encode('utf-8')
     header_ca = json.loads(json.dumps(header_for_sign))
     header_ca['timestamp'] = t
@@ -202,7 +203,7 @@ def get_cred(grant):
 def get_binding_list():
     v = []
     resp = requests.get(binding_url, headers=get_sign_header(binding_url, 'get', None, header)).json()
-
+    # print(f"森空岛时间戳：{resp['timestamp']}")
     if resp['code'] != 0:
         print(f"请求角色列表出现问题：{resp['message']}")
         if resp.get('message') == '用户未登录':
@@ -236,14 +237,14 @@ def do_sign(cred_resp):
         # list_awards(1, i.get('uid'))
         resp = requests.post(sign_url, headers=get_sign_header(sign_url, 'post', body, header), json=body).json()
         if resp['code'] != 0:
-            rtn = f'角色{i.get("nickName")}({i.get("channelName")})签到失败了！原因：{resp.get("message")}'
+            print(f'角色{i.get("nickName")}({i.get("channelName")})签到失败了！原因：{resp.get("message")}')
             continue
         awards = resp['data']['awards']
         for j in awards:
             res = j['resource']
-            rtn = f'角色{i.get("nickName")}({i.get("channelName")})签到成功，获得了{res["name"]}×{j.get("count") or 1}'
-    return rtn
-
+            print(
+                f'角色{i.get("nickName")}({i.get("channelName")})签到成功，获得了{res["name"]}×{j.get("count") or 1}'
+            )
 
 
 def save(token):

@@ -1,5 +1,3 @@
-import json
-import time
 import os
 import pathlib
 import platform
@@ -535,11 +533,9 @@ class InputDialog(QDialog):
             sim_name = 'mumu12'
             adb_path = get_process_path('MuMuPlayer.exe')
             if adb_path[:1] == '"':
-                process = subprocess.Popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe" adb -v 0', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                adb_port = os.popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe" adb -v 0 2>&1').read()
             else:
-                process = subprocess.Popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe adb -v 0', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            adb_port, stderr = process.communicate()
-            adb_port = str(adb_port)[2:-1]
+                adb_port = os.popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe adb -v 0 2>&1').read()
             logger.info(adb_port)
             if adb_port == '':
                 logger.error('Failed to get mumu12 adb port')
