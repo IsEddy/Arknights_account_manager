@@ -29,7 +29,6 @@ console_handler.setLevel(logging.DEBUG)  # 设置控制台处理器的级别
 console_handler.setFormatter(logging.Formatter('[%(asctime)s] - %(name)s - %(levelname)s: %(message)s'))
 logger.addHandler(console_handler)
 
-
 group_count = 1
 app_name = '斯卡蒂账号小助手'  # 程序名
 sleeptime = 60  # 多少s检测一次时间
@@ -37,8 +36,7 @@ rogue_name = 'Sami'
 adb_path = ''
 adb_port = ''
 pre_input = ''
-do_count = 0  # 用于一键清日常的计数
-version = 0.14
+version = 0.16
 is_running = False
 
 try:
@@ -70,6 +68,7 @@ try:
 except:
     sim_name = 'ld'  # 什么模拟器
 
+
 class PrintOutput(QPlainTextEdit):  # print重写
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -95,8 +94,10 @@ class PrintOutput(QPlainTextEdit):  # print重写
             cursor.insertText('\n')
             self.setTextCursor(cursor)
             self.ensureCursorVisible()
+
     def flush(self):
         pass
+
 
 def print_error(*args, **kwargs):
     # Set is_error attribute to True when calling print_error
@@ -135,7 +136,6 @@ def set_win_task(wake_time, name, pwd):
     logger.info(f"Set wakeup task {name} at {wake_time}")
     time.sleep(1)
     os.remove('temp_task.xml')
-
 
 
 class TimerThread(QThread):  # 多线程，用于账号切换
@@ -187,7 +187,8 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         time.sleep(2)
         logger.info("[Child Thread]Killing 自动精灵...")
         try:
-            subprocess.run(''.join([pre_input, 'am force-stop com.zdanjian.zdanjian']), shell=True)  # 关闭自动精灵(你可以用自动精灵，不会出事)
+            subprocess.run(''.join([pre_input, 'am force-stop com.zdanjian.zdanjian']),
+                           shell=True)  # 关闭自动精灵(你可以用自动精灵，不会出事)
         except Exception as e:
             logger.error(f"[Child Thread]Failed to kill 自动精灵：{e}")
         time.sleep(2)
@@ -232,7 +233,7 @@ class TimerThread(QThread):  # 多线程，用于账号切换
                             # 打开!方舟
                         else:
                             tap_point(pre_input, int(point.split(",")[0]), int(point.split(",")[1]),
-                                             size_x, size_y)
+                                      size_x, size_y)
                             time.sleep(t)
                     break
                 # else:
@@ -273,8 +274,10 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         #     logger.info("[Child Thread]Disconnect adb failed")
         # else:
         #     logger.info("[Child Thread]Disconnect adb succeeded")
-        logger.info("[Child Thread]Shutting down RuntimeBroker.exe...")
-        run_command('taskkill /pid RuntimeBroker.exe /f')
+        
+        # logger.info("[Child Thread]Shutting down RuntimeBroker.exe...")
+        # run_command('taskkill /pid RuntimeBroker.exe /f') # 这个应该不需要了
+
         # 启动MAA
         time.sleep(2)
         print("正在启动MAA")
@@ -318,6 +321,8 @@ def get_process_path(process_name):  # 获取进程的绝对位置
             if proc.info['name'] == process_name:
                 path1 = os.path.abspath(proc.exe())
                 path2 = pathlib.Path(path1).parent
+                logger.debug(f"path1   {path1}")
+                logger.debug(f"path2   {path2}")
                 if sim_name == 'ld' or sim_name == 'mumu12' or sim_name == 'nox':
                     path1 = ''.join([str(path2), r'\adb.exe'])  # 雷电的adb路径
                 elif sim_name == 'bluestacks':
@@ -497,7 +502,8 @@ class InputDialog(QDialog):
         self.account_timer = QTimer(self)
 
         if pwd is None:
-            pwd, ok = QInputDialog.getText(self, '输入密码', '首次启动请输入你电脑的”登陆密码“（不是pin！！！），\n密码仅用于创建唤醒任务，且只会保存在本地，\n以便您可以放心的让电脑睡眠：\n')
+            pwd, ok = QInputDialog.getText(self, '输入密码',
+                                           '首次启动请输入你电脑的”登陆密码“（不是pin！！！），\n密码仅用于创建唤醒任务，且只会保存在本地，\n以便您可以放心的让电脑睡眠：\n')
             if ok and pwd != "":
                 set_win_task("03:50", "WakeUp3", pwd)
             else:
@@ -568,7 +574,7 @@ class InputDialog(QDialog):
         logger.info(f"Using pre input: {pre_input}")
 
         print('设置模拟器为：', self.sim_name.currentText(), '\n'
-                                                      'Adb路径：', adb_path)
+                                                            'Adb路径：', adb_path)
         self.save_info()
 
     def deeebuuuggg(self):
@@ -610,7 +616,6 @@ class InputDialog(QDialog):
         input_group = (account_edit, password_edit, time_edit, if_rogue, rogue_name, switch)  # 将一组输入框打包为一个元组
         self.inputs.append(input_group)
         self.save_info()  # 保存info.txt文件中的数据
-
 
         with open("info.json", "r") as f:
             data = []
@@ -681,7 +686,7 @@ class InputDialog(QDialog):
             if data:
                 data.popitem()  # 如果列表不为空，删除最后一个元素
             tapdelay = self.tapdelay.text()
-            settings = {"Theme": theme, "TapDelay" : tapdelay, "Debug" : if_debug, "Password" : pwd, "Simulator" :sim_name}
+            settings = {"Theme": theme, "TapDelay": tapdelay, "Debug": if_debug, "Password": pwd, "Simulator": sim_name}
             data = {"Accounts": data, "Settings": settings}
             with open("info.json", "w") as f:
                 json.dump(data, f, indent=4)
@@ -779,11 +784,11 @@ class InputDialog(QDialog):
             account_switch = switch.isChecked()
             group_data = {"group": group_count, "account": account, "password": password, "time": time,
                           "if_rogue": if_rogue, "rogue_name": rogue_name, "switch": account_switch}  # 将一组数据打包为一个字典对象
-            group_data = {f"account{group_count}" : group_data}
+            group_data = {f"account{group_count}": group_data}
             data.update(group_data)  # 将一组数据添加到列表中
         tapdelay = self.tapdelay.text()
-        settings = {"Theme": theme, "TapDelay" : tapdelay, "Debug" : if_debug, "Password" : pwd, "Simulator" :sim_name}
-        data = {"Accounts" : data, "Settings" : settings}
+        settings = {"Theme": theme, "TapDelay": tapdelay, "Debug": if_debug, "Password": pwd, "Simulator": sim_name}
+        data = {"Accounts": data, "Settings": settings}
 
         with open("info.json", "w") as f:
             json.dump(data, f, indent=4)
@@ -845,7 +850,7 @@ class InputDialog(QDialog):
             print(f'MAA当前状态：{judge}')
             f.close()
         for i in times:
-            if judge == 'Stop' and do_count == i-1:
+            if judge == 'Stop' and do_count == i - 1:
                 timer_thread = TimerThread(times[i][0], times[i][1], times[i][2], times[i][3])
                 if is_running is False:
                     do_count += 1
@@ -886,9 +891,9 @@ class InputDialog(QDialog):
                     rogue_name = "Phantom"
                 times[time] = [account, password, rogue, rogue_name, i]
                 print(f'第{i}组账号：', account, '\n'
-                        '执行时间：', time, '\n'
-                        '是否肉鸽：', rogue, '\n'
-                        '打哪个（如果打）：', rogue_name)
+                                                '执行时间：', time, '\n'
+                                                                   '是否肉鸽：', rogue, '\n'
+                                                                                       '打哪个（如果打）：', rogue_name)
         minitime2 = datetime.strptime(minitime, "%H:%M") + timedelta(hours=12)
         minitime2 = minitime2.strftime("%H:%M")
         set_win_task(minitime, 'WakeUp', pwd)
@@ -1007,7 +1012,7 @@ class InputDialog(QDialog):
                     self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
                     self.account_timer_thread.signal_start_rogue.connect(self.start_rogue_timer)
                     self.account_timer_thread.start()
-                    while is_running is False:pass
+                    while is_running is False: pass
                 # TimerThread.run(times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4])
 
     # def getInputs(self):
