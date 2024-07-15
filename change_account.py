@@ -3,6 +3,7 @@ import pathlib
 import platform
 import subprocess
 import sys
+import time
 from datetime import datetime, timedelta
 
 import cv2
@@ -119,23 +120,51 @@ def get_data():
 
 
 def set_win_task(wake_time, name, pwd):
-    username = fr"{platform.node()}\{os.getlogin()}"
+    username = fr"{platform.node()}\{os.getlogin()}"[(fr"{platform.node()}\{os.getlogin()}").find('\\') + 1:]
+    result = subprocess.run('wmic useraccount get name,sid',
+                            capture_output=True, text=True, check=True).stdout.strip().split('\n')
+    result_dict = {}
+    # 遍历每一行
+    for line in result:
+        # 使用空格分割每一行，期望得到两部分：字符a和字符b
+        parts = line.split(None, 1)  # split(None, 1) 使用None作为分隔符，并且只分割一次
+        if len(parts) == 2:
+            # 假设parts[0]是字符a，parts[1]是字符b（去除了两边的空格）
+            a, b = parts[0].strip(), parts[1].strip()
+            # 将这对字符添加到字典中
+            result_dict[a] = b
+    for key, value in result_dict.items():
+        if key == username:
+            # 假设SID是唯一的非空行（或第一行非空行，如果输出格式固定）
+            usersid = value
+            break
 
-    with open('./asst/wake.xml', 'r', encoding="UTF-16") as template_file:
+
+    with open(''.join([asst_path, r'\asst\wake.xml']), 'r', encoding="UTF-16") as template_file:
         xml_template = template_file.read()
 
-    updated_xml = xml_template.replace('<StartBoundary>2023-10-05T16:10:00</StartBoundary>',
+    updated_xml = xml_template.replace('<StartBoundary>2024-07-15T15:15:00</StartBoundary>',
                                        f'<StartBoundary>2023-10-05T{wake_time}:00</StartBoundary>')
-    updated_xml = updated_xml.replace('<URI>\test</URI>', fr'<URI>\{name}</URI>')
-    updated_xml = updated_xml.replace('<UserId>UserName</UserId>', fr'<UserId>{username}</UserId>')
+    updated_xml = updated_xml.replace('<URI>\测试</URI>', fr'<URI>\{name}</URI>')
+    updated_xml = updated_xml.replace('<UserId>UserName</UserId>', fr'<UserId>{usersid}</UserId>')
 
     with open('temp_task.xml', 'w') as temp_xml_file:
         temp_xml_file.write(updated_xml)
-    commands = fr'schtasks /create /xml "{str(pathlib.Path(__file__).parent)}\temp_task.xml" /tn "{name}" /f /ru "{username}" /rp "{pwd}"'
+    xml_path = str(pathlib.Path(__file__).parent)
+    while os.path.isfile(''.join([str(xml_path), "/temp_task.xml"])) is False:
+        xml_path = pathlib.Path(xml_path).parent
+        if len(str(path)) == 3:
+            logger.error("Loading wakeup xml error, exiting...")
+            exit()
+    commands = fr'schtasks /create /xml "{xml_path}\temp_task.xml" /tn "{name}" /f"'
+    with open('temp.bat', 'w') as temp:
+        temp.write(commands)
+    subprocess.run(['temp.bat'], check=True)
     run_command(commands)
     logger.info(f"Set wakeup task {name} at {wake_time}")
-    time.sleep(1)
     os.remove('temp_task.xml')
+    os.remove('temp.bat')
+    time.sleep(0.2)
 
 
 class TimerThread(QThread):  # 多线程，用于账号切换
@@ -505,7 +534,7 @@ class InputDialog(QDialog):
             pwd, ok = QInputDialog.getText(self, '输入密码',
                                            '首次启动请输入你电脑的”登陆密码“（不是pin！！！），\n密码仅用于创建唤醒任务，且只会保存在本地，\n以便您可以放心的让电脑睡眠：\n')
             if ok and pwd != "":
-                set_win_task("03:50", "WakeUp3", pwd)
+                set_win_task("15:55", "WakeUp3", pwd)
             else:
                 msg = QMessageBox()
                 msg.setIcon(QMessageBox.Question)
@@ -880,9 +909,10 @@ class InputDialog(QDialog):
             rogue = group["if_rogue"]
             rogue_name = group["rogue_name"]  # 0为萨米，1为水月，2为愧影
             account_switch = group["switch"]
-            if minitime == None or datetime.strptime(minitime, "%H:%M") > datetime.strptime(time, "%H:%M"):
-                minitime = time
             if account_switch:
+                if minitime == None or datetime.strptime(minitime, "%H:%M") > datetime.strptime(time, "%H:%M"):  #
+                    # 只有开启的账号才会进行唤醒
+                    minitime = time
                 if rogue_name == 0:
                     rogue_name = "Sami"
                 elif rogue_name == 1:
@@ -1087,6 +1117,8 @@ if __name__ == '__main__':
     logger.info(f"[--Version v{version}         --]")
     logger.info(f"[--User Dir {str(pathlib.Path(__file__).parent)} --]")
     logger.info("[--------------------------]")
+
+    asst_path = str(pathlib.Path(__file__).parent)
 
     '''初始化MAA'''
     path = pathlib.Path(__file__).parent.parent
