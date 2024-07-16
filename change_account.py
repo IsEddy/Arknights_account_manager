@@ -159,7 +159,11 @@ def set_win_task(wake_time, name, pwd):
     commands = fr'schtasks /create /xml "{xml_path}\temp_task.xml" /tn "{name}" /f"'
     with open('temp.bat', 'w') as temp:
         temp.write(commands)
-    subprocess.run(['temp.bat'], check=True)
+    try:
+        subprocess.run(['temp.bat'], check=True)
+    except Exception as e:
+        logger.error(["Set wakeup task failed:", e])
+        print_error("创建唤醒任务异常，用管理员重新启动试试？")
     run_command(commands)
     logger.info(f"Set wakeup task {name} at {wake_time}")
     os.remove('temp_task.xml')
@@ -568,14 +572,22 @@ class InputDialog(QDialog):
             sim_name = 'mumu12'
             adb_path = get_process_path('MuMuPlayer.exe')
             if adb_path[:1] == '"':
-                adb_port = os.popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe" adb -v 0 2>&1').read()
+                commands = ''.join([str(pathlib.Path(adb_path).parent), r'\MuMuManager.exe" adb -v 0 2>&1'])
             else:
-                adb_port = os.popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe adb -v 0 2>&1').read()
-            logger.info(adb_port)
-            if adb_port == '':
-                logger.error('Failed to get mumu12 adb port')
+                commands = ''.join([str(pathlib.Path(adb_path).parent), r'\MuMuManager.exe adb -v 0 2>&1'])
+            with open('temp.bat', 'w') as temp:
+                temp.write(commands)
+            try:
+                adb_port = subprocess.run(['temp.bat'], capture_output=True, check=True).stdout
+                adb_port = adb_port[adb_port.find("")]
+            except Exception as e:
+                logger.error(['Failed to get mumu12 adb port:', e])
                 print_error("获取mumu12模拟器adb端口失败！")
+            os.remove('temp.bat')
+
+            if adb_port == '':
                 adb_port = '127.0.0.1:5555'
+            logger.info(adb_port)
             pre_input = ''.join([adb_path + ' shell '])
         elif self.sim_name.currentText() == '蓝叠模拟器':
             sim_name = 'bluestacks'
