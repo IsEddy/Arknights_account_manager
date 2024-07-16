@@ -139,7 +139,6 @@ def set_win_task(wake_time, name, pwd):
             usersid = value
             break
 
-
     with open(''.join([asst_path, r'\asst\wake.xml']), 'r', encoding="UTF-16") as template_file:
         xml_template = template_file.read()
 
@@ -159,6 +158,7 @@ def set_win_task(wake_time, name, pwd):
     commands = fr'schtasks /create /xml "{xml_path}\temp_task.xml" /tn "{name}" /f"'
     with open('temp.bat', 'w') as temp:
         temp.write(commands)
+        print(commands)
     try:
         os.startfile('temp.bat')
     except Exception as e:
@@ -166,9 +166,9 @@ def set_win_task(wake_time, name, pwd):
         print_error("创建唤醒任务异常，用管理员重新启动试试？")
     run_command(commands)
     logger.info(f"Set wakeup task {name} at {wake_time}")
+    time.sleep(1)
     os.remove('temp_task.xml')
     os.remove('temp.bat')
-    time.sleep(0.2)
 
 
 class TimerThread(QThread):  # 多线程，用于账号切换
@@ -307,7 +307,7 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         #     logger.info("[Child Thread]Disconnect adb failed")
         # else:
         #     logger.info("[Child Thread]Disconnect adb succeeded")
-        
+
         # logger.info("[Child Thread]Shutting down RuntimeBroker.exe...")
         # run_command('taskkill /pid RuntimeBroker.exe /f') # 这个应该不需要了
 
@@ -538,7 +538,7 @@ class InputDialog(QDialog):
             pwd, ok = QInputDialog.getText(self, '输入密码',
                                            '首次启动请输入你电脑的”登陆密码“（不是pin！！！），\n密码仅用于创建唤醒任务，且只会保存在本地，\n以便您可以放心的让电脑睡眠：\n')
             if ok and pwd != "":
-                set_win_task("15:55", "WakeUp3", pwd)
+                set_win_task("03:50", "WakeUp3", pwd)
             else:
                 msg = QMessageBox()
                 msg.setIcon(QMessageBox.Question)
@@ -587,7 +587,8 @@ class InputDialog(QDialog):
                 # while os.path.isfile('temp.txt') is False:
                 #     time.sleep(0.1)
                 # os.system('temp1.bat')　　#　这个命令打包之后会报错，我也不知道为什么
-                with open('temp.txt', 'r') as temp:adb_port = temp.read().strip()
+                with open('temp.txt', 'r') as temp:
+                    adb_port = temp.read().strip()
             except Exception as e:
                 logger.error(['Failed to get mumu12 adb port:', e])
                 print_error("获取mumu12模拟器adb端口失败！")
