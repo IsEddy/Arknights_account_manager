@@ -160,7 +160,7 @@ def set_win_task(wake_time, name, pwd):
     with open('temp.bat', 'w') as temp:
         temp.write(commands)
     try:
-        subprocess.run(['temp.bat'], check=True)
+        os.startfile('temp.bat')
     except Exception as e:
         logger.error(["Set wakeup task failed:", e])
         print_error("创建唤醒任务异常，用管理员重新启动试试？")
@@ -572,21 +572,33 @@ class InputDialog(QDialog):
             sim_name = 'mumu12'
             adb_path = get_process_path('MuMuPlayer.exe')
             if adb_path[:1] == '"':
-                commands = ''.join([str(pathlib.Path(adb_path).parent), r'\MuMuManager.exe" adb -v 0 2>&1'])
+                commands = ''.join([str(pathlib.Path(adb_path).parent), r'\MuMuManager.exe" adb -v 0 > temp.txt'])
             else:
-                commands = ''.join([str(pathlib.Path(adb_path).parent), r'\MuMuManager.exe adb -v 0 2>&1'])
+                commands = ''.join([str(pathlib.Path(adb_path).parent), r'\MuMuManager.exe adb -v 0 > temp.txt'])
             with open('temp.bat', 'w') as temp:
                 temp.write(commands)
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Question)
+            msg.setWindowTitle("提示")
+            msg.setText("请双击文件夹中的temp.bat，完毕后点击OK")
+            msg.exec_()  # sorry，这里只能手动运行
             try:
-                adb_port = str(subprocess.run(['temp.bat'], capture_output=True, check=True).stdout)
-                adb_port = adb_port[adb_port.rfind(r"\n") + 2:-1]
+                # os.startfile('temp.bat')  #　哪怕用startfile也不行
+                # while os.path.isfile('temp.txt') is False:
+                #     time.sleep(0.1)
+                # os.system('temp1.bat')　　#　这个命令打包之后会报错，我也不知道为什么
+                with open('temp.txt', 'r') as temp:adb_port = temp.read().strip()
             except Exception as e:
                 logger.error(['Failed to get mumu12 adb port:', e])
                 print_error("获取mumu12模拟器adb端口失败！")
             os.remove('temp.bat')
+            os.remove('temp.txt')
+            time.sleep(0.2)
 
             if adb_port == '':
                 adb_port = '127.0.0.1:5555'
+                logger.error(['Failed to get mumu12 adb port: unknown error'])
+                print_error("获取mumu12模拟器adb端口失败！")
             logger.info(adb_port)
             pre_input = ''.join([adb_path + ' shell '])
         elif self.sim_name.currentText() == '蓝叠模拟器':
