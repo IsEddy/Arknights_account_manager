@@ -578,8 +578,8 @@ class InputDialog(QDialog):
             with open('temp.bat', 'w') as temp:
                 temp.write(commands)
             try:
-                adb_port = subprocess.run(['temp.bat'], capture_output=True, check=True).stdout
-                adb_port = adb_port[adb_port.find("")]
+                adb_port = str(subprocess.run(['temp.bat'], capture_output=True, check=True).stdout)
+                adb_port = adb_port[adb_port.rfind(r"\n") + 2:-1]
             except Exception as e:
                 logger.error(['Failed to get mumu12 adb port:', e])
                 print_error("获取mumu12模拟器adb端口失败！")
