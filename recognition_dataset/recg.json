@@ -55,6 +55,11 @@
     "taps": "open_game"
   },
   {
+    "image": "menu2.png",
+    "threshold": "0.9",
+    "taps": "open_game"
+  },
+  {
     "image": "exitinfrast.png",
     "threshold": "0.9",
     "taps": "1420,750"

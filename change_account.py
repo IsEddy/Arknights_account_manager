@@ -3,6 +3,7 @@ import pathlib
 import platform
 import subprocess
 import sys
+import time
 from datetime import datetime, timedelta
 
 import cv2
@@ -29,7 +30,6 @@ console_handler.setLevel(logging.DEBUG)  # 设置控制台处理器的级别
 console_handler.setFormatter(logging.Formatter('[%(asctime)s] - %(name)s - %(levelname)s: %(message)s'))
 logger.addHandler(console_handler)
 
-
 group_count = 1
 app_name = '斯卡蒂账号小助手'  # 程序名
 sleeptime = 60  # 多少s检测一次时间
@@ -37,8 +37,7 @@ rogue_name = 'Sami'
 adb_path = ''
 adb_port = ''
 pre_input = ''
-do_count = 0  # 用于一键清日常的计数
-version = 0.14
+version = 0.16
 is_running = False
 
 try:
@@ -70,6 +69,7 @@ try:
 except:
     sim_name = 'ld'  # 什么模拟器
 
+
 class PrintOutput(QPlainTextEdit):  # print重写
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -95,8 +95,10 @@ class PrintOutput(QPlainTextEdit):  # print重写
             cursor.insertText('\n')
             self.setTextCursor(cursor)
             self.ensureCursorVisible()
+
     def flush(self):
         pass
+
 
 def print_error(*args, **kwargs):
     # Set is_error attribute to True when calling print_error
@@ -118,24 +120,55 @@ def get_data():
 
 
 def set_win_task(wake_time, name, pwd):
-    username = fr"{platform.node()}\{os.getlogin()}"
+    username = fr"{platform.node()}\{os.getlogin()}"[(fr"{platform.node()}\{os.getlogin()}").find('\\') + 1:]
+    result = subprocess.run('wmic useraccount get name,sid',
+                            capture_output=True, text=True, check=True).stdout.strip().split('\n')
+    result_dict = {}
+    # 遍历每一行
+    for line in result:
+        # 使用空格分割每一行，期望得到两部分：字符a和字符b
+        parts = line.split(None, 1)  # split(None, 1) 使用None作为分隔符，并且只分割一次
+        if len(parts) == 2:
+            # 假设parts[0]是字符a，parts[1]是字符b（去除了两边的空格）
+            a, b = parts[0].strip(), parts[1].strip()
+            # 将这对字符添加到字典中
+            result_dict[a] = b
+    for key, value in result_dict.items():
+        if key == username:
+            # 假设SID是唯一的非空行（或第一行非空行，如果输出格式固定）
+            usersid = value
+            break
 
-    with open('./asst/wake.xml', 'r', encoding="UTF-16") as template_file:
+    with open(''.join([asst_path, r'\asst\wake.xml']), 'r', encoding="UTF-16") as template_file:
         xml_template = template_file.read()
 
-    updated_xml = xml_template.replace('<StartBoundary>2023-10-05T16:10:00</StartBoundary>',
+    updated_xml = xml_template.replace('<StartBoundary>2024-07-15T15:15:00</StartBoundary>',
                                        f'<StartBoundary>2023-10-05T{wake_time}:00</StartBoundary>')
-    updated_xml = updated_xml.replace('<URI>\test</URI>', fr'<URI>\{name}</URI>')
-    updated_xml = updated_xml.replace('<UserId>UserName</UserId>', fr'<UserId>{username}</UserId>')
+    updated_xml = updated_xml.replace('<URI>\测试</URI>', fr'<URI>\{name}</URI>')
+    updated_xml = updated_xml.replace('<UserId>UserName</UserId>', fr'<UserId>{usersid}</UserId>')
 
     with open('temp_task.xml', 'w') as temp_xml_file:
         temp_xml_file.write(updated_xml)
-    commands = fr'schtasks /create /xml "{str(pathlib.Path(__file__).parent)}\temp_task.xml" /tn "{name}" /f /ru "{username}" /rp "{pwd}"'
+    xml_path = str(pathlib.Path(__file__).parent)
+    while os.path.isfile(''.join([str(xml_path), "/temp_task.xml"])) is False:
+        xml_path = pathlib.Path(xml_path).parent
+        if len(str(path)) == 3:
+            logger.error("Loading wakeup xml error, exiting...")
+            exit()
+    commands = fr'schtasks /create /xml "{xml_path}\temp_task.xml" /tn "{name}" /f"'
+    with open('temp.bat', 'w') as temp:
+        temp.write(commands)
+        print(commands)
+    try:
+        os.startfile('temp.bat')
+    except Exception as e:
+        logger.error(["Set wakeup task failed:", e])
+        print_error("创建唤醒任务异常，用管理员重新启动试试？")
     run_command(commands)
     logger.info(f"Set wakeup task {name} at {wake_time}")
     time.sleep(1)
     os.remove('temp_task.xml')
-
+    os.remove('temp.bat')
 
 
 class TimerThread(QThread):  # 多线程，用于账号切换
@@ -187,7 +220,8 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         time.sleep(2)
         logger.info("[Child Thread]Killing 自动精灵...")
         try:
-            subprocess.run(''.join([pre_input, 'am force-stop com.zdanjian.zdanjian']), shell=True)  # 关闭自动精灵(你可以用自动精灵，不会出事)
+            subprocess.run(''.join([pre_input, 'am force-stop com.zdanjian.zdanjian']),
+                           shell=True)  # 关闭自动精灵(你可以用自动精灵，不会出事)
         except Exception as e:
             logger.error(f"[Child Thread]Failed to kill 自动精灵：{e}")
         time.sleep(2)
@@ -232,7 +266,7 @@ class TimerThread(QThread):  # 多线程，用于账号切换
                             # 打开!方舟
                         else:
                             tap_point(pre_input, int(point.split(",")[0]), int(point.split(",")[1]),
-                                             size_x, size_y)
+                                      size_x, size_y)
                             time.sleep(t)
                     break
                 # else:
@@ -273,8 +307,10 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         #     logger.info("[Child Thread]Disconnect adb failed")
         # else:
         #     logger.info("[Child Thread]Disconnect adb succeeded")
-        logger.info("[Child Thread]Shutting down RuntimeBroker.exe...")
-        run_command('taskkill /pid RuntimeBroker.exe /f')
+
+        # logger.info("[Child Thread]Shutting down RuntimeBroker.exe...")
+        # run_command('taskkill /pid RuntimeBroker.exe /f') # 这个应该不需要了
+
         # 启动MAA
         time.sleep(2)
         print("正在启动MAA")
@@ -318,6 +354,8 @@ def get_process_path(process_name):  # 获取进程的绝对位置
             if proc.info['name'] == process_name:
                 path1 = os.path.abspath(proc.exe())
                 path2 = pathlib.Path(path1).parent
+                logger.debug(f"path1   {path1}")
+                logger.debug(f"path2   {path2}")
                 if sim_name == 'ld' or sim_name == 'mumu12' or sim_name == 'nox':
                     path1 = ''.join([str(path2), r'\adb.exe'])  # 雷电的adb路径
                 elif sim_name == 'bluestacks':
@@ -497,7 +535,8 @@ class InputDialog(QDialog):
         self.account_timer = QTimer(self)
 
         if pwd is None:
-            pwd, ok = QInputDialog.getText(self, '输入密码', '首次启动请输入你电脑的”登陆密码“（不是pin！！！），\n密码仅用于创建唤醒任务，且只会保存在本地，\n以便您可以放心的让电脑睡眠：\n')
+            pwd, ok = QInputDialog.getText(self, '输入密码',
+                                           '首次启动请输入你电脑的”登陆密码“（不是pin！！！），\n密码仅用于创建唤醒任务，且只会保存在本地，\n以便您可以放心的让电脑睡眠：\n')
             if ok and pwd != "":
                 set_win_task("03:50", "WakeUp3", pwd)
             else:
@@ -533,14 +572,35 @@ class InputDialog(QDialog):
             sim_name = 'mumu12'
             adb_path = get_process_path('MuMuPlayer.exe')
             if adb_path[:1] == '"':
-                adb_port = os.popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe" adb -v 0 2>&1').read()
+                commands = ''.join([str(pathlib.Path(adb_path).parent), r'\MuMuManager.exe" adb -v 0 > temp.txt'])
             else:
-                adb_port = os.popen(str(pathlib.Path(adb_path).parent) + r'\MuMuManager.exe adb -v 0 2>&1').read()
-            logger.info(adb_port)
-            if adb_port == '':
-                logger.error('Failed to get mumu12 adb port')
+                commands = ''.join([str(pathlib.Path(adb_path).parent), r'\MuMuManager.exe adb -v 0 > temp.txt'])
+            with open('temp.bat', 'w') as temp:
+                temp.write(commands)
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Question)
+            msg.setWindowTitle("提示")
+            msg.setText("请双击文件夹中的temp.bat，完毕后点击OK")
+            msg.exec_()  # sorry，这里只能手动运行
+            try:
+                # os.startfile('temp.bat')  #　哪怕用startfile也不行
+                # while os.path.isfile('temp.txt') is False:
+                #     time.sleep(0.1)
+                # os.system('temp1.bat')　　#　这个命令打包之后会报错，我也不知道为什么
+                with open('temp.txt', 'r') as temp:
+                    adb_port = temp.read().strip()
+            except Exception as e:
+                logger.error(['Failed to get mumu12 adb port:', e])
                 print_error("获取mumu12模拟器adb端口失败！")
+            os.remove('temp.bat')
+            os.remove('temp.txt')
+            time.sleep(0.2)
+
+            if adb_port == '':
                 adb_port = '127.0.0.1:5555'
+                logger.error(['Failed to get mumu12 adb port: unknown error'])
+                print_error("获取mumu12模拟器adb端口失败！")
+            logger.info(adb_port)
             pre_input = ''.join([adb_path + ' shell '])
         elif self.sim_name.currentText() == '蓝叠模拟器':
             sim_name = 'bluestacks'
@@ -568,7 +628,7 @@ class InputDialog(QDialog):
         logger.info(f"Using pre input: {pre_input}")
 
         print('设置模拟器为：', self.sim_name.currentText(), '\n'
-                                                      'Adb路径：', adb_path)
+                                                            'Adb路径：', adb_path)
         self.save_info()
 
     def deeebuuuggg(self):
@@ -610,7 +670,6 @@ class InputDialog(QDialog):
         input_group = (account_edit, password_edit, time_edit, if_rogue, rogue_name, switch)  # 将一组输入框打包为一个元组
         self.inputs.append(input_group)
         self.save_info()  # 保存info.txt文件中的数据
-
 
         with open("info.json", "r") as f:
             data = []
@@ -681,7 +740,7 @@ class InputDialog(QDialog):
             if data:
                 data.popitem()  # 如果列表不为空，删除最后一个元素
             tapdelay = self.tapdelay.text()
-            settings = {"Theme": theme, "TapDelay" : tapdelay, "Debug" : if_debug, "Password" : pwd, "Simulator" :sim_name}
+            settings = {"Theme": theme, "TapDelay": tapdelay, "Debug": if_debug, "Password": pwd, "Simulator": sim_name}
             data = {"Accounts": data, "Settings": settings}
             with open("info.json", "w") as f:
                 json.dump(data, f, indent=4)
@@ -779,11 +838,11 @@ class InputDialog(QDialog):
             account_switch = switch.isChecked()
             group_data = {"group": group_count, "account": account, "password": password, "time": time,
                           "if_rogue": if_rogue, "rogue_name": rogue_name, "switch": account_switch}  # 将一组数据打包为一个字典对象
-            group_data = {f"account{group_count}" : group_data}
+            group_data = {f"account{group_count}": group_data}
             data.update(group_data)  # 将一组数据添加到列表中
         tapdelay = self.tapdelay.text()
-        settings = {"Theme": theme, "TapDelay" : tapdelay, "Debug" : if_debug, "Password" : pwd, "Simulator" :sim_name}
-        data = {"Accounts" : data, "Settings" : settings}
+        settings = {"Theme": theme, "TapDelay": tapdelay, "Debug": if_debug, "Password": pwd, "Simulator": sim_name}
+        data = {"Accounts": data, "Settings": settings}
 
         with open("info.json", "w") as f:
             json.dump(data, f, indent=4)
@@ -845,7 +904,7 @@ class InputDialog(QDialog):
             print(f'MAA当前状态：{judge}')
             f.close()
         for i in times:
-            if judge == 'Stop' and do_count == i-1:
+            if judge == 'Stop' and do_count == i - 1:
                 timer_thread = TimerThread(times[i][0], times[i][1], times[i][2], times[i][3])
                 if is_running is False:
                     do_count += 1
@@ -875,9 +934,10 @@ class InputDialog(QDialog):
             rogue = group["if_rogue"]
             rogue_name = group["rogue_name"]  # 0为萨米，1为水月，2为愧影
             account_switch = group["switch"]
-            if minitime == None or datetime.strptime(minitime, "%H:%M") > datetime.strptime(time, "%H:%M"):
-                minitime = time
             if account_switch:
+                if minitime == None or datetime.strptime(minitime, "%H:%M") > datetime.strptime(time, "%H:%M"):  #
+                    # 只有开启的账号才会进行唤醒
+                    minitime = time
                 if rogue_name == 0:
                     rogue_name = "Sami"
                 elif rogue_name == 1:
@@ -886,9 +946,9 @@ class InputDialog(QDialog):
                     rogue_name = "Phantom"
                 times[time] = [account, password, rogue, rogue_name, i]
                 print(f'第{i}组账号：', account, '\n'
-                        '执行时间：', time, '\n'
-                        '是否肉鸽：', rogue, '\n'
-                        '打哪个（如果打）：', rogue_name)
+                                                '执行时间：', time, '\n'
+                                                                   '是否肉鸽：', rogue, '\n'
+                                                                                       '打哪个（如果打）：', rogue_name)
         minitime2 = datetime.strptime(minitime, "%H:%M") + timedelta(hours=12)
         minitime2 = minitime2.strftime("%H:%M")
         set_win_task(minitime, 'WakeUp', pwd)
@@ -1007,7 +1067,7 @@ class InputDialog(QDialog):
                     self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
                     self.account_timer_thread.signal_start_rogue.connect(self.start_rogue_timer)
                     self.account_timer_thread.start()
-                    while is_running is False:pass
+                    while is_running is False: pass
                 # TimerThread.run(times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4])
 
     # def getInputs(self):
@@ -1082,6 +1142,8 @@ if __name__ == '__main__':
     logger.info(f"[--Version v{version}         --]")
     logger.info(f"[--User Dir {str(pathlib.Path(__file__).parent)} --]")
     logger.info("[--------------------------]")
+
+    asst_path = str(pathlib.Path(__file__).parent)
 
     '''初始化MAA'''
     path = pathlib.Path(__file__).parent.parent
