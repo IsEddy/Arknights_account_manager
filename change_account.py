@@ -157,9 +157,9 @@ def set_win_task(wake_time, name, pwd):
             logger.error("Loading wakeup xml error, exiting...")
             exit()
     commands = fr'schtasks /create /xml "{xml_path}\temp_task.xml" /tn "{name}" /f"'
+    logger.info(f"Running command:{commands}")
     with open('temp.bat', 'w') as temp:
         temp.write(commands)
-        print(commands)
     try:
         os.startfile('temp.bat')
     except Exception as e:
@@ -219,12 +219,12 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         print("成功连接至", dialog.sim_name.currentText())
         logger.info("[Child Thread]Successfully connect to simulator.")
         time.sleep(2)
-        logger.info("[Child Thread]Killing 自动精灵...")
-        try:
-            subprocess.run(''.join([pre_input, 'am force-stop com.zdanjian.zdanjian']),
-                           shell=True)  # 关闭自动精灵(你可以用自动精灵，不会出事)
-        except Exception as e:
-            logger.error(f"[Child Thread]Failed to kill 自动精灵：{e}")
+        # logger.info("[Child Thread]Killing 自动精灵...")
+        # try:
+        #     subprocess.run(''.join([pre_input, 'am force-stop com.zdanjian.zdanjian']),
+        #                    shell=True)  # 关闭自动精灵(你可以用自动精灵，不会出事)
+        # except Exception as e:
+        #     logger.error(f"[Child Thread]Failed to kill 自动精灵：{e}")
         time.sleep(2)
         size = os.popen(pre_input + 'wm size').read()
         size = size[size.find(":") + 2:]
@@ -390,7 +390,14 @@ class InputDialog(QDialog):
 
     def capture_screen(self, img=None):  # 截图函数，返回模拟器状态
         global adb_path, sim_name, adb_port
-        dump_path = ''.join([str(pathlib.Path(__file__).parent), r'\recognition_dataset'])
+        dump_path = pathlib.Path(__file__).parent
+        while os.path.isfile(''.join([str(dump_path), "/recognition_dataset/recg.json"])) is False:
+            dump_path = pathlib.Path(dump_path).parent
+            time.sleep(1)
+            if len(str(dump_path)) == 3:
+                logger.error("Loading recognition dataset failed, exiting...")
+                os._exit()
+        dump_path = ''.join([str(dump_path), r'\recognition_dataset'])
         logger.info("Delete image cache")
         run_command("del " + dump_path + r"\ss.png")
         run_command(
@@ -401,7 +408,7 @@ class InputDialog(QDialog):
         time.sleep(1)  # adb: error:
         i = 0
         while True:
-            logger.info("Pulling image to dump path")
+            logger.info(f"Pulling image to {dump_path}")
             time.sleep(1)
             if sim_name == 'ld':
                 popen = os.popen(
@@ -898,10 +905,9 @@ class InputDialog(QDialog):
         self.one_key_timer = QTimer(self)
         self.one_key_timer.timeout.connect(lambda: self.one_key_command(times))
         self.one_key_timer.start(sleeptime * 1000)
-        time.sleep(2)
 
     def one_key_command(self, times):
-        global do_count, group_count, path
+        global do_count, group_count
         try:
             with open(''.join([str(path), r'\MAA.Judge']), "r") as f:
                 judge = f.readlines()[-1]
