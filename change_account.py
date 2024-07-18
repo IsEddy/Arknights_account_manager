@@ -31,6 +31,7 @@ console_handler.setFormatter(logging.Formatter('[%(asctime)s] - %(name)s - %(lev
 logger.addHandler(console_handler)
 
 group_count = 1
+do_count = 0
 app_name = '斯卡蒂账号小助手'  # 程序名
 sleeptime = 60  # 多少s检测一次时间
 rogue_name = 'Sami'
@@ -890,30 +891,36 @@ class InputDialog(QDialog):
             if account_switch:
                 i += 1
                 times[i] = [account, password, False, group["group"]]
+
+        logger.info(f"Start on account:{times}")
         self.save_info()
         self.setWindowTitle(app_name + '：开始运行！')
         self.one_key_timer = QTimer(self)
         self.one_key_timer.timeout.connect(lambda: self.one_key_command(times))
         self.one_key_timer.start(sleeptime * 1000)
+        time.sleep(2)
 
     def one_key_command(self, times):
-        global do_count, group_count
-        with open(''.join([str(pathlib.Path(__file__).parent.parent), r'\MAA.Judge']), "r") as f:
-            judge = f.readlines()[-1]
-            logger.info(f"[One Key Timer]Detect MAA:{judge}")
-            print(f'MAA当前状态：{judge}')
-            f.close()
-        for i in times:
-            if judge == 'Stop' and do_count == i - 1:
-                timer_thread = TimerThread(times[i][0], times[i][1], times[i][2], times[i][3])
-                if is_running is False:
-                    do_count += 1
-                    timer_thread.start()
-                time.sleep(2)
-                if do_count == group_count:
-                    logger.info("[One Key Timer]All account complete!")
-                    print("所有账号执行完毕！")
-                    self.one_key_timer.stop()
+        global do_count, group_count, path
+        try:
+            with open(''.join([str(path), r'\MAA.Judge']), "r") as f:
+                judge = f.readlines()[-1]
+                logger.info(f"[One Key Timer]Detect MAA:{judge}")
+                print(f'MAA当前状态：{judge}')
+                f.close()
+            for i in times:
+                if judge == 'Stop' and do_count == i - 1:
+                    timer_thread = TimerThread(times[i][0], times[i][1], times[i][2], times[i][3])
+                    if is_running is False:
+                        do_count += 1
+                        timer_thread.start()
+                    time.sleep(2)
+                    if do_count == group_count:
+                        logger.info("[One Key Timer]All account complete!")
+                        print("所有账号执行完毕！")
+                        self.one_key_timer.stop()
+        except Exception as e:
+            logger.error(f"Error in running One Key Timer:{e}")
 
     def start_command(self):  # 开始按钮
         logger.info("Account timer start!")
