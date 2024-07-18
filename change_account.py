@@ -316,29 +316,31 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         time.sleep(2)
         print("正在启动MAA")
         logger.info("[Child Thread]Starting MAA...")
-        with open(''.join(str(path) + '\config\gui.json'), 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            if ''.join(['account', str(group)]) in data['Configurations']:
-                logger.info("[Child Thread]Custom config found!")
-                command = ''.join(
-                    [str(pathlib.Path(__file__).parent.parent), r"\maa.exe --config ", 'account', str(group)])
-                logger.info("[Child Thread]Start MAA in config account" + str(group))
-            elif 'main' in data['Configurations']:
-                command = ''.join([str(pathlib.Path(__file__).parent.parent), r"\maa.exe --config main"])
-                logger.info("[Child Thread]Start MAA in config main")
-            else:
-                command = ''.join([str(pathlib.Path(__file__).parent.parent), r"\maa.exe"])
-                logger.info("[Child Thread]Start MAA in Default config")
-            subprocess.Popen(command)
-            f.close()
+        try:
+            with open(''.join(str(path) + '\config\gui.json'), 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if ''.join(['account', str(group)]) in data['Configurations']:
+                    logger.info("[Child Thread]Custom config found!")
+                    command = ''.join([str(path), r"\maa.exe --config ", 'account', str(group)])
+                    logger.info("[Child Thread]Start MAA in config account" + str(group))
+                elif 'main' in data['Configurations']:
+                    command = ''.join([str(path), r"\maa.exe --config main"])
+                    logger.info("[Child Thread]Start MAA in config main")
+                else:
+                    command = ''.join([str(path), r"\maa.exe"])
+                    logger.info("[Child Thread]Start MAA in Default config")
+                subprocess.Popen(command)
+                f.close()
+        except Exception as e:
+            logger.error(f"Error in starting MAA:{e}")
         if if_rogue and dialog.rogue_timer.isActive() is False:  # 开启肉鸽定时器
             logger.info("[Child Thread]Start Rogue timer!")
             self.signal_start_rogue.emit()
-        with open(''.join([str(pathlib.Path(__file__).parent.parent), r'\MAA.Judge']), "r") as f:
+        with open(''.join([str(path), r'\MAA.Judge']), "r") as f:
             judge = f.read()
             f.close()
         while judge == "Stop":
-            with open(''.join([str(pathlib.Path(__file__).parent.parent), r'\MAA.Judge']), "r") as f:
+            with open(''.join([str(path), r'\MAA.Judge']), "r") as f:
                 judge = f.read()
                 f.close()
         logger.info("[Child Thread]Task Complete")
@@ -920,7 +922,7 @@ class InputDialog(QDialog):
                     if is_running is False:
                         do_count += 1
                         timer_thread.start()
-                    time.sleep(2)
+                    time.sleep(0.5)
                     if do_count == group_count:
                         logger.info("[One Key Timer]All account complete!")
                         print("所有账号执行完毕！")
@@ -1096,7 +1098,7 @@ class InputDialog(QDialog):
         global adb_path, rogue_name
 
         # 设置为存放 dll 文件及资源的路径
-        with open(''.join([str(pathlib.Path(__file__).parent.parent), r'\MAA.Judge']), "r") as f:
+        with open(''.join([str(path), r'\MAA.Judge']), "r") as f:
             judge = f.readlines()[-1]
             print('MAA当前状态：', judge)
             f.close()
