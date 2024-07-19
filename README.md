@@ -23,30 +23,36 @@ maa文件夹
 ├───maa.exe
 ├───adb
 ├───change_account
-│   ├───asst
+│   ├───_internal
+│   │   ├───asst
+│   │   └───......(剩下的文件)
 │   ├───recognition_dataset
 │   ├───change_account.exe
-│   ├───......(剩下的文件)
+│   ├───skadi.ico
 ├───MaaCore.dll
 ├───MaaDerpLearning.dll
 ├───MaaIsOff.bat
 ├───MaaIsOn.bat
 ├───onnxruntime_maa.dll
-└───opencv_world4_maa.dll
+├───opencv_world4_maa.dll
+└───......(剩下的文件)
+
 ```
 
 如果可以正常打开的话，那就没有问题啦！
 
 接下来就是填写你所有的账号密码，以及你希望它启动的时间！（需要注意的是，脚本在切换账号时将会强制结束MAA，所以请预留好足够的任务时间）
 
+### 如果不能的话，提issue的时候记得附上change_account文件夹里边的debug文件夹
+
 -----------------------------------
 ##  MAA设置：
 - 1. 将MAA的开始前脚本框填上MaaIsOn.bat
 - 2. MAA的结束后脚本框填上MaaIsOff.bat
 - 3. 若是多个账号都使用同一个maa配置：只需再maa中添加“main”配置，并勾选maa的“启动后自动开始任务”选项
-- 若是有账号使用特殊的maa配置：再maa中添加账号相对应的配置，举例：账号1需要使用自定义配置，则在maa中添加名为“account1”的配置，账号2就是“account2”，以此类推。
+  - 若是有账号使用特殊的maa配置：再maa中添加账号相对应的配置，举例：账号1需要使用自定义配置，则在maa中添加名为“account1”的配置，账号2就是“account2”，以此类推。
 	
-## 注意!!!!!仍旧需要勾选maa的“启动后自动开始任务”选项!!!!! 程序会自动检测已经存在的配置并启动，若是该账号不再使用自定义配置，只需删除对应的配置即可。
+### 注意!!!!!仍旧需要勾选maa的“启动后自动开始任务”选项!!!!! 程序会自动检测已经存在的配置并启动，若是该账号不再使用自定义配置，只需删除对应的配置即可。
 
 -----------------------------------
 ## ！！！！！重要注意！！！！！
@@ -60,6 +66,7 @@ maa文件夹
 
 -----------------------------------
 # 致谢
+- MAA https://github.com/MaaAssistantArknights/MaaAssistantArknights
 - 森空岛签到 By xxyz30 https://github.com/xxyz30/skyland-auto-sign (MIT Licence)
 - Logo By QuAn_ https://www.pixiv.net/users/6657532
 
@@ -67,6 +74,8 @@ maa文件夹
 # 更新日志：
 ## v0.16 :
 - 修复mumu模拟器端口获取问题
+- 修复各种闪退问题
+- 自动唤醒还是没搞定
 
 ## v0.15 :
 - 信息储存大改，过去使用过的需要重新填写账号密码（sorry）
