@@ -10,9 +10,9 @@ import cv2
 import psutil
 import qdarktheme
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
-from PyQt5.QtGui import QIcon, QFont, QDoubleValidator, QTextCharFormat, QColor
+from PyQt5.QtGui import QIcon, QFont, QDoubleValidator, QTextCharFormat, QColor, QFontMetrics
 from PyQt5.QtWidgets import QFormLayout, QDialog, QLineEdit, QTimeEdit, QApplication, QCheckBox, QPushButton, \
-    QMessageBox, QComboBox, QPlainTextEdit, QHBoxLayout, QInputDialog
+    QMessageBox, QComboBox, QPlainTextEdit, QHBoxLayout, QInputDialog, QVBoxLayout
 
 from asst.asst import Asst
 from asst.emulator import Bluestacks  # MAA的集成，用于获取蓝叠的adbport
@@ -486,13 +486,13 @@ class InputDialog(QDialog):
         self.change_btn.clicked.connect(self.change_command)
 
         self.rogue_btn = QPushButton('手动开始打肉鸽', self)
-        self.rogue_btn.clicked.connect(self.start_rogue)
+        self.rogue_btn.clicked.connect(self.one_key_rogue)
 
         self.hidden_btn = InvisibleButton("deeebuuuggg", self)
         self.hidden_btn.clicked.connect(self.deeebuuuggg)
 
         self.one_key = QPushButton('一键全部清日常', self)
-        self.one_key.clicked.connect(self.one_key_btn_command)
+        self.one_key.clicked.connect(self.one_key_btn)
 
         self.tapdelay = QLineEdit()
         self.tapdelay.setText(str(tapdelay))
@@ -886,7 +886,7 @@ class InputDialog(QDialog):
             self.stop_command()
             self.start_command()
 
-    def one_key_btn_command(self):
+    def one_key_btn(self):
         global do_count
         logger.info("One key timer start!")
         print("一键清理智开始")
@@ -1096,6 +1096,32 @@ class InputDialog(QDialog):
         self.rogue_timer.timeout.connect(lambda: self.start_rogue())
         self.rogue_timer.setInterval(5 * 60 * 1000)
         self.rogue_timer.start()
+
+    def one_key_rogue(self):
+        global rogue_name
+        dialog = QDialog(self)
+        dialog.setWindowTitle("请选择打哪个肉鸽")
+        combobox = QComboBox()
+        combobox.addItems(rogue_list)
+        btn = QPushButton("OK")
+        btn.clicked.connect(dialog.accept)
+        layout = QVBoxLayout()
+        layout.addWidget(combobox)
+        layout.addWidget(btn)
+        dialog.setFixedWidth(QFontMetrics(dialog.font()).width(dialog.windowTitle()) * 3)
+        dialog.setLayout(layout)
+        if dialog.exec_() == QDialog.Accepted:
+            rogue_name = combobox.currentIndex()
+        if rogue_name == 0:
+            rogue_name = "Sami"
+        elif rogue_name == 1:
+            rogue_name = "Mizuki"
+        elif rogue_name == 2:
+            rogue_name = "Phantom"
+        elif rogue_name == 3:
+            rogue_name = "Sarkaz"
+        self.start_rogue()
+
 
     def start_rogue(self):  # 肉鸽主函数
         global adb_path, rogue_name
