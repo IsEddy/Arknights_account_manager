@@ -34,12 +34,13 @@ group_count = 1
 do_count = 0
 app_name = '斯卡蒂账号小助手'  # 程序名
 sleeptime = 60  # 多少s检测一次时间
-rogue_name = 'Sami'
+rogue_name = 'Sarkaz'
 adb_path = ''
 adb_port = ''
 pre_input = ''
 version = 0.16
 is_running = False
+rogue_list = ['萨米', '水月', '傀影', '萨卡兹']
 
 try:
     with open("info.json", "r") as f:
@@ -670,7 +671,7 @@ class InputDialog(QDialog):
         if_rogue = QCheckBox(self)
         if_rogue.clicked.connect(self.switch_btn_command)
         rogue_name = QComboBox(self)
-        rogue_name.addItems(['萨米', '水月', '傀影'])
+        rogue_name.addItems(rogue_list)
         switch = SwitchBtn()
         switch.setOnText("账号已开启！")
         switch.setOffText("账号已关闭！")
@@ -709,7 +710,7 @@ class InputDialog(QDialog):
                     if_rogue.setChecked(rogue)
                     if_rogue.clicked.connect(self.switch_btn_command)
                     rogue_name = QComboBox(self)
-                    rogue_name.addItems(['萨米', '水月', '傀影'])
+                    rogue_name.addItems(rogue_list)
                     rogue_name.setCurrentIndex(rogue_number)
                     switch = SwitchBtn()
                     switch.setOnText("账号已开启！")
@@ -772,7 +773,7 @@ class InputDialog(QDialog):
                 password = group["password"]
                 time = group["time"]
                 rogue = bool(group["if_rogue"])
-                rogue_number = group["rogue_name"]  # 0为萨米，1为水月，2为愧影
+                rogue_number = group["rogue_name"]  # 0为萨米，1为水月，2为愧影, 3为萨卡兹
                 account_switch = group["switch"]
                 account_edit = QLineEdit(self)
                 account_edit.setText(account)
@@ -788,7 +789,7 @@ class InputDialog(QDialog):
                 if_rogue.setChecked(rogue)
                 if_rogue.clicked.connect(self.switch_btn_command)
                 rogue_name = QComboBox(self)
-                rogue_name.addItems(['萨米', '水月', '傀影'])
+                rogue_name.addItems(rogue_list)
                 rogue_name.setCurrentIndex(rogue_number)
                 switch = SwitchBtn()
                 switch.setOnText("账号已开启！")
@@ -814,7 +815,7 @@ class InputDialog(QDialog):
             if_rogue.setText('任务完毕后打肉鸽')
 
             rogue_name = QComboBox(self)
-            rogue_name.addItems(['萨米', '水月', '傀影'])
+            rogue_name.addItems(rogue_list)
             switch = SwitchBtn()
             switch.setOnText("账号已开启！")
             switch.setOffText("账号已关闭！")
@@ -959,6 +960,8 @@ class InputDialog(QDialog):
                     rogue_name = "Mizuki"
                 elif rogue_name == 2:
                     rogue_name = "Phantom"
+                elif rogue_name == 3:
+                    rogue_name = "Sarkaz"
                 times[time] = [account, password, rogue, rogue_name, i]
                 print(f'第{i}组账号：', account, '\n'
                                                 '执行时间：', time, '\n'
@@ -1108,7 +1111,7 @@ class InputDialog(QDialog):
             logger.info(f"[Rogue Timer]Rogue task:{rogue_name}")
             print('此次肉鸽任务为：', rogue_name)
             # 触控方案配置  请务必设置adbinput！！！！！！！！！！！  # 戳啦，都能用啦（ # 最新消息，minitouch有几率不能用
-            if asst.set_instance_option(InstanceOptionType.touch_type, 'adb'):
+            if asst.set_instance_option(InstanceOptionType.touch_type, 'maatouch'):
                 logger.info("[Rogue Timer]Adb connection successful!")
                 print('Adb连接成功！')
             else:
@@ -1128,6 +1131,7 @@ class InputDialog(QDialog):
                 # Phantom - 傀影与猩红血钻
                 # Mizuki  - 水月与深蓝之树
                 # Sami  - 探索者的银凇止境
+                # Sarkaz  - 萨卡兹的无终奇语
                 "mode": 0,  # 模式，可选项。默认 0
                 # 0 - 刷蜡烛，尽可能稳定的打更多层数
                 # 1 - 刷源石锭，第一层投资完就退出
