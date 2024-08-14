@@ -196,6 +196,16 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         password = self.password
         if_rogue = self.if_rogue
         group = self.group
+        # 终止adb
+        print("尝试终止adb ...")
+        logger.info("[Child Thread]Killing adb.exe...")  # 似乎不终止adb更好?
+        popen = os.popen('taskkill /pid adb.exe /f 2>&1').read()
+        print(popen)
+        if popen[:2] == "错误":
+            print("终止adb失败，用管理员方式打开试试？")
+            logger.info("[Child Thread]Disconnect adb failed")
+        else:
+            logger.info("[Child Thread]Disconnect adb succeeded")
         # 终止MAA
         print("尝试终止MAA ...")
         logger.info("[Child Thread]Killing MAA...")
@@ -220,12 +230,12 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         print("成功连接至", dialog.sim_name.currentText())
         logger.info("[Child Thread]Successfully connect to simulator.")
         time.sleep(2)
-        # logger.info("[Child Thread]Killing 自动精灵...")
-        # try:
-        #     subprocess.run(''.join([pre_input, 'am force-stop com.zdanjian.zdanjian']),
-        #                    shell=True)  # 关闭自动精灵(你可以用自动精灵，不会出事)
-        # except Exception as e:
-        #     logger.error(f"[Child Thread]Failed to kill 自动精灵：{e}")
+        logger.info("[Child Thread]Killing 自动精灵...")
+        try:
+            subprocess.run(''.join([pre_input, 'am force-stop com.zdanjian.zdanjian']),
+                           shell=True)  # 关闭自动精灵(你可以用自动精灵，不会出事)
+        except Exception as e:
+            logger.error(f"[Child Thread]Failed to kill 自动精灵：{e}")
         time.sleep(2)
         size = os.popen(pre_input + 'wm size').read()
         size = size[size.find(":") + 2:]
@@ -296,19 +306,8 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         time.sleep(t)
         tap_point(pre_input, 960, 750, size_x, size_y)
         time.sleep(t)
-        # 终止adb
         logger.info("[Child Thread]Disconnecting adb...")
         run_command(adb_path + ' disconnect')
-        time.sleep(2)
-        # print("尝试终止adb ...")
-        # logger.info("[Child Thread]Killing adb.exe...")  # 似乎不终止adb更好?
-        # popen = os.popen('taskkill /pid adb.exe /f 2>&1').read()
-        # print(popen)
-        # if popen[:2] == "错误":
-        #     print("终止adb失败，用管理员方式打开试试？")
-        #     logger.info("[Child Thread]Disconnect adb failed")
-        # else:
-        #     logger.info("[Child Thread]Disconnect adb succeeded")
 
         # logger.info("[Child Thread]Shutting down RuntimeBroker.exe...")
         # run_command('taskkill /pid RuntimeBroker.exe /f') # 这个应该不需要了
@@ -544,20 +543,6 @@ class InputDialog(QDialog):
 
         self.rogue_timer = QTimer(self)
         self.account_timer = QTimer(self)
-
-        if pwd is None:
-            pwd, ok = QInputDialog.getText(self, '输入密码',
-                                           '首次启动请输入你电脑的”登陆密码“（不是pin！！！），\n密码仅用于创建唤醒任务，且只会保存在本地，\n以便您可以放心的让电脑睡眠：\n')
-            if ok and pwd != "":
-                set_win_task("03:50", "WakeUp3", pwd)
-            else:
-                msg = QMessageBox()
-                msg.setIcon(QMessageBox.Question)
-                msg.setWindowTitle("提示")
-                msg.setText("好吧b（￣▽￣）d　不输也没关系 \n 只是如果你的电脑进入睡眠模式了脚本就不起作用了哦")
-                msg.exec_()
-        else:
-            set_win_task("03:50", "WakeUp3", pwd)
         self.save_info()
 
     def redirect_print_to_widget(self):
@@ -694,7 +679,7 @@ class InputDialog(QDialog):
                     password = group["password"]
                     time = group["time"]  # 获取时间
                     rogue = bool(group["if_rogue"])
-                    rogue_number = group["rogue_name"]  # 0为萨米，1为水月，2为愧影
+                    rogue_number = group["rogue_name"]  # 0为萨米，1为水月，2为愧影, 3为萨卡兹
                     account_switch = group["switch"]
                     account_edit = QLineEdit(self)
                     account_edit.setText(account)
@@ -773,7 +758,7 @@ class InputDialog(QDialog):
                 password = group["password"]
                 time = group["time"]
                 rogue = bool(group["if_rogue"])
-                rogue_number = group["rogue_name"]  # 0为萨米，1为水月，2为愧影, 3为萨卡兹
+                rogue_number = group["rogue_name"]  # 0为萨米，1为水月，2为愧影, 3为萨卡兹, 3为萨卡兹
                 account_switch = group["switch"]
                 account_edit = QLineEdit(self)
                 account_edit.setText(account)
@@ -948,7 +933,7 @@ class InputDialog(QDialog):
             password = group["password"]
             time = group["time"]
             rogue = group["if_rogue"]
-            rogue_name = group["rogue_name"]  # 0为萨米，1为水月，2为愧影
+            rogue_name = group["rogue_name"]  # 0为萨米，1为水月，2为愧影, 3为萨卡兹
             account_switch = group["switch"]
             if account_switch:
                 if minitime == None or datetime.strptime(minitime, "%H:%M") > datetime.strptime(time, "%H:%M"):  #
@@ -1024,7 +1009,7 @@ class InputDialog(QDialog):
         data = get_data()
         times = {}  # 创建一个空字典，用于存放时间和对应的数据
         i = 0
-        for group in data:  # 遍历字典中的每一组数据
+        for group in data:
             i += 1
             account = group["account"]
             password = group["password"]
@@ -1063,7 +1048,8 @@ class InputDialog(QDialog):
             run_command(pre_input + 'am force-stop com.hypergryph.arknights')  # 关掉!方舟
             time.sleep(2)
             logger.info("Starting Arknights...")
-            run_command(pre_input + 'monkey -p com.hypergryph.arknights -c android.intent.category.LAUNCHER 1')  # 打开!方舟
+            run_command(
+                pre_input + 'monkey -p com.hypergryph.arknights -c android.intent.category.LAUNCHER 1')  # 方舟，启动！
             time.sleep(2)
             run_command(adb_path + ' disconnect')
             logger.info("Restart complete!")
@@ -1122,7 +1108,6 @@ class InputDialog(QDialog):
             rogue_name = "Sarkaz"
         self.start_rogue()
 
-
     def start_rogue(self):  # 肉鸽主函数
         global adb_path, rogue_name
 
@@ -1167,8 +1152,8 @@ class InputDialog(QDialog):
                 # "investments_count": int,
                 # 投资源石锭 次数，可选，默认 INT_MAX。达到后自动停止任务
                 # "squad": string,        # 开局分队，可选，例如 "突击战术分队" 等，默认 "指挥分队"
-                # "roles": string,        # 开局职业组，可选，例如 "先手必胜" 等，默认 "取长补短"
-                # "core_char": string,    # 开局干员名，可选，仅支持单个干员中！文！名！。默认识别练度自动选择
+                "roles": "取长补短",  # 开局职业组，可选，例如 "先手必胜" 等，默认 "取长补短"
+                "core_char": "银灰",  # 开局干员名，可选，仅支持单个干员中！文！名！。默认识别练度自动选择
                 "use_support": True,  # 开局干员是否为助战干员，可选，默认 false
                 # "use_nonfriend_support": bool,  # 是否可以是非好友助战干员，可选，默认 false，use_support为true时有效
                 # "refresh_trader_with_dice": bool  # 是否用骰子刷新商店购买特殊商品，目前支持水月肉鸽的指路鳞，可选，默认 false
@@ -1202,6 +1187,20 @@ if __name__ == '__main__':
     Asst.load(path=path)
     asst = Asst()
     logger.info(f"Loading MAA succeed!")
+
+    if pwd is None:
+        pwd, ok = QInputDialog.getText(None, '输入密码',
+                                       '首次启动请输入你电脑的”登陆密码“（不是pin！！！），\n密码仅用于创建唤醒任务，且只会保存在本地，\n以便您可以放心的让电脑睡眠：\n')
+        if ok and pwd != "":
+            set_win_task("03:50", "WakeUp3", pwd)
+        else:
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Question)
+            msg.setWindowTitle("提示")
+            msg.setText("好吧b（￣▽￣）d　不输也没关系 \n 只是如果你的电脑进入睡眠模式了脚本就不起作用了哦")
+            msg.exec_()
+    else:
+        set_win_task("03:50", "WakeUp3", pwd)
 
     app = QApplication(sys.argv)
     qdarktheme.setup_theme(theme)
