@@ -38,7 +38,7 @@ rogue_name = 'Sarkaz'
 adb_path = ''
 adb_port = ''
 pre_input = ''
-version = 0.17
+version = 0.18
 is_running = False
 rogue_list = ['萨米', '水月', '傀影', '萨卡兹']
 
