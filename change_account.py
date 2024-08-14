@@ -1188,9 +1188,16 @@ if __name__ == '__main__':
     asst = Asst()
     logger.info(f"Loading MAA succeed!")
 
+    logger.info("Qt initialization success.")
+    app = QApplication(sys.argv)
+    qdarktheme.setup_theme(theme)
+
     if pwd is None:
-        pwd, ok = QInputDialog.getText(None, '输入密码',
-                                       '首次启动请输入你电脑的”登陆密码“（不是pin！！！），\n密码仅用于创建唤醒任务，且只会保存在本地，\n以便您可以放心的让电脑睡眠：\n')
+        try:
+            pwd, ok = QInputDialog.getText(None, '输入密码',
+                                           '首次启动请输入你电脑的”登陆密码“（不是pin！！！），\n密码仅用于创建唤醒任务，且只会保存在本地，\n以便您可以放心的让电脑睡眠：\n')
+        except Exception as e:
+            logger.info(e)
         if ok and pwd != "":
             set_win_task("03:50", "WakeUp3", pwd)
         else:
@@ -1202,8 +1209,6 @@ if __name__ == '__main__':
     else:
         set_win_task("03:50", "WakeUp3", pwd)
 
-    app = QApplication(sys.argv)
-    qdarktheme.setup_theme(theme)
     ss = InputDialog()
     ss.show()
     ss.redirect_print_to_widget()
