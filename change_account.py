@@ -197,15 +197,15 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         if_rogue = self.if_rogue
         group = self.group
         # 终止adb
-        print("尝试终止adb ...")
-        logger.info("[Child Thread]Killing adb.exe...")  # 似乎不终止adb更好?
-        popen = os.popen('taskkill /pid adb.exe /f 2>&1').read()
-        print(popen)
-        if popen[:2] == "错误":
-            print("终止adb失败，用管理员方式打开试试？")
-            logger.info("[Child Thread]Disconnect adb failed")
-        else:
-            logger.info("[Child Thread]Disconnect adb succeeded")
+        # print("尝试终止adb ...")
+        # logger.info("[Child Thread]Killing adb...")  # 似乎不终止adb更好?
+        # popen = os.popen('taskkill /pid adb.exe /f 2>&1').read()
+        # print(popen)
+        # if popen[:2] == "错误":
+        #     print("终止adb失败，用管理员方式打开试试？")
+        #     logger.info("[Child Thread]Disconnect adb failed")
+        # else:
+        #     logger.info("[Child Thread]Disconnect adb succeeded")
         # 终止MAA
         print("尝试终止MAA ...")
         logger.info("[Child Thread]Killing MAA...")
