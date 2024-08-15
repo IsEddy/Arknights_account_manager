@@ -1155,7 +1155,7 @@ class InputDialog(QDialog):
                 "roles": "取长补短",  # 开局职业组，可选，例如 "先手必胜" 等，默认 "取长补短"
                 "core_char": "银灰",  # 开局干员名，可选，仅支持单个干员中！文！名！。默认识别练度自动选择
                 "use_support": True,  # 开局干员是否为助战干员，可选，默认 false
-                # "use_nonfriend_support": bool,  # 是否可以是非好友助战干员，可选，默认 false，use_support为true时有效
+                "use_nonfriend_support": True,  # 是否可以是非好友助战干员，可选，默认 false，use_support为true时有效
                 # "refresh_trader_with_dice": bool  # 是否用骰子刷新商店购买特殊商品，目前支持水月肉鸽的指路鳞，可选，默认 false
             })
             asst.start()
