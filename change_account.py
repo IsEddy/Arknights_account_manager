@@ -359,7 +359,7 @@ def get_process_path(process_name):  # 获取进程的绝对位置
                 path2 = pathlib.Path(path1).parent
                 logger.debug(f"path1   {path1}")
                 logger.debug(f"path2   {path2}")
-                if sim_name == 'ld' or sim_name == 'mumu12' or sim_name == 'nox':
+                if sim_name in['ld', 'mumu12', 'nox', 'memu']:
                     path1 = ''.join([str(path2), r'\adb.exe'])  # 雷电的adb路径
                 elif sim_name == 'bluestacks':
                     path1 = ''.join([str(path2), r'\HD-Adb.exe'])
@@ -504,7 +504,7 @@ class InputDialog(QDialog):
         self.tapdelay.setValidator(validator)
 
         self.sim_name = QComboBox(self)
-        self.sim_name.addItems(['雷电模拟器', 'MuMu 模拟器', 'MuMu 模拟器 12', '蓝叠模拟器', '夜神模拟器', '通用模式'])
+        self.sim_name.addItems(['雷电模拟器', 'MuMu 模拟器', 'MuMu 模拟器 12', '蓝叠模拟器', '夜神模拟器', '逍遥模拟器', '通用模式'])
         if sim_name == 'ld':
             self.sim_name.setCurrentIndex(0)
         elif sim_name == 'mumu':
@@ -515,8 +515,10 @@ class InputDialog(QDialog):
             self.sim_name.setCurrentIndex(3)
         elif sim_name == 'nox':
             self.sim_name.setCurrentIndex(4)
-        elif sim_name == 'default':
+        elif sim_name == 'memu':
             self.sim_name.setCurrentIndex(5)
+        elif sim_name == 'default':
+            self.sim_name.setCurrentIndex(6)
         self.sim_name.currentIndexChanged.connect(self.change_adb_path)
 
         self.setWindowFlag(Qt.CustomizeWindowHint)
@@ -612,6 +614,11 @@ class InputDialog(QDialog):
             sim_name = 'nox'
             adb_port = '127.0.0.1:62001'
             adb_path = get_process_path('Nox.exe')
+            pre_input = ''.join([adb_path + ' shell '])
+        elif self.sim_name.currentText() == '逍遥模拟器':
+            sim_name = 'memu'
+            adb_port = '127.0.0.1:21503'
+            adb_path = get_process_path('MEmu.exe')
             pre_input = ''.join([adb_path + ' shell '])
         elif self.sim_name.currentText() == '通用模式':
             sim_name = 'default'
