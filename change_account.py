@@ -3,7 +3,6 @@ import pathlib
 import platform
 import subprocess
 import sys
-import time
 from datetime import datetime, timedelta
 
 import cv2
@@ -15,7 +14,8 @@ from PyQt5.QtWidgets import QFormLayout, QDialog, QLineEdit, QTimeEdit, QApplica
     QMessageBox, QComboBox, QPlainTextEdit, QHBoxLayout, QInputDialog, QVBoxLayout
 
 from asst.asst import Asst
-from asst.emulator import Bluestacks  # MAA的集成，用于获取蓝叠的adbport
+from asst.utils import Message, Version, InstanceOptionType
+from asst.updater import Updater  # MAA的集成，用于获取蓝叠的adbport
 from asst.skyland import *  # 森空岛签到，by xxyz30
 from asst.switchbutton import SwitchBtn, InvisibleButton  # 自定义的两个按钮库
 from asst.utils import InstanceOptionType  # MAA的集成，用于肉鸽
@@ -72,12 +72,20 @@ except:
     sim_name = 'ld'  # 什么模拟器
 
 
+@Asst.CallBackType
+def my_callback(msg, details, arg):
+    m = Message(msg)
+    d = json.loads(details.decode('utf-8'))
+
+    print(m, d, arg)
+
+
 class PrintOutput(QPlainTextEdit):  # print重写
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setReadOnly(True)
         self.cache = ""
-        font = QFont("Courier New", 10)  # 使用Courier New字体，大小为10
+        font = QFont("Courier New", 10)
         self.setFont(font)
 
     def write(self, text):
@@ -116,14 +124,26 @@ def get_data():
     with open("info.json", "r") as f:
         data = []
         data_temp = json.load(f)["Accounts"]
-        for item in data_temp:
-            data.append(data_temp[item])
+        standard_defaults = {
+            "Server": False
+        }
+
+        for account_name, account_data in data_temp.items():
+            # 创建账户数据的副本，避免修改原始数据
+            account_copy = account_data.copy()
+
+            # 检查并补充缺失的键
+            for key, default_value in standard_defaults.items():
+                if key not in account_copy:
+                    account_copy[key] = default_value
+
+            data.append(account_copy)
     return data
 
 
 def set_win_task(wake_time, name, pwd):
     username = fr"{platform.node()}\{os.getlogin()}"[(fr"{platform.node()}\{os.getlogin()}").find('\\') + 1:]
-    result = subprocess.run('wmic useraccount get name,sid',
+    result = subprocess.run(["powershell", "-Command", "Get-CimInstance -ClassName Win32_UserAccount | Select-Object Name, SID"],
                             capture_output=True, text=True, check=True).stdout.strip().split('\n')
     result_dict = {}
     # 遍历每一行
@@ -140,50 +160,53 @@ def set_win_task(wake_time, name, pwd):
             # 假设SID是唯一的非空行（或第一行非空行，如果输出格式固定）
             usersid = value
             break
-
-    with open(''.join([asst_path, r'\asst\wake.xml']), 'r', encoding="UTF-16") as template_file:
-        xml_template = template_file.read()
-
-    updated_xml = xml_template.replace('<StartBoundary>2024-07-15T15:15:00</StartBoundary>',
-                                       f'<StartBoundary>2023-10-05T{wake_time}:00</StartBoundary>')
-    updated_xml = updated_xml.replace('<URI>\测试</URI>', fr'<URI>\{name}</URI>')
-    updated_xml = updated_xml.replace('<UserId>UserName</UserId>', fr'<UserId>{usersid}</UserId>')
-
-    with open('temp_task.xml', 'w') as temp_xml_file:
-        temp_xml_file.write(updated_xml)
-    xml_path = str(pathlib.Path(__file__).parent)
-    while os.path.isfile(''.join([str(xml_path), "/temp_task.xml"])) is False:
-        xml_path = pathlib.Path(xml_path).parent
-        if len(str(path)) == 3:
-            logger.error("Loading wakeup xml error, exiting...")
-            exit()
-    commands = fr'schtasks /create /xml "{xml_path}\temp_task.xml" /tn "{name}" /f"'
-    logger.info(f"Running command:{commands}")
-    with open('temp.bat', 'w') as temp:
-        temp.write(commands)
     try:
-        os.startfile('temp.bat')
+        with open(''.join([asst_path, r'\asst\wake.xml']), 'r', encoding="UTF-16") as template_file:
+            xml_template = template_file.read()
+
+        updated_xml = xml_template.replace('<StartBoundary>2024-07-15T15:15:00</StartBoundary>',
+                                           f'<StartBoundary>2023-10-05T{wake_time}:00</StartBoundary>')
+        updated_xml = updated_xml.replace('<URI>\测试</URI>', fr'<URI>\{name}</URI>')
+        updated_xml = updated_xml.replace('<UserId>UserName</UserId>', fr'<UserId>{usersid}</UserId>')
+
+        with open('temp_task.xml', 'w') as temp_xml_file:
+            temp_xml_file.write(updated_xml)
+        xml_path = str(pathlib.Path(__file__).parent)
+        while os.path.isfile(''.join([str(xml_path), "/temp_task.xml"])) is False:
+            xml_path = pathlib.Path(xml_path).parent
+            if len(str(path)) == 3:
+                logger.error("Loading wakeup xml error, exiting...")
+                exit()
+        commands = fr'schtasks /create /xml "{xml_path}\temp_task.xml" /tn "{name}" /f"'
+        logger.info(f"Running command:{commands}")
+        with open('temp.bat', 'w') as temp:
+            temp.write(commands)
+        try:
+            os.startfile('temp.bat')
+        except Exception as e:
+            logger.error(["Set wakeup task failed:", e])
+            print_error("创建唤醒任务异常，用管理员重新启动试试？")
+        run_command(commands)
+        logger.info(f"Set wakeup task {name} at {wake_time}")
+        time.sleep(1)
+        os.remove('temp_task.xml')
+        os.remove('temp.bat')
     except Exception as e:
-        logger.error(["Set wakeup task failed:", e])
-        print_error("创建唤醒任务异常，用管理员重新启动试试？")
-    run_command(commands)
-    logger.info(f"Set wakeup task {name} at {wake_time}")
-    time.sleep(1)
-    os.remove('temp_task.xml')
-    os.remove('temp.bat')
+        logger.error(e)
 
 
 class TimerThread(QThread):  # 多线程，用于账号切换
     timer_signal = pyqtSignal(str)
     signal_start_rogue = pyqtSignal()
 
-    def __init__(self, account, password, if_rogue: bool, group):
+    def __init__(self, account, password, if_rogue: bool, group, server: bool):
         super().__init__()
         self.is_running = is_running
         self.account = account
         self.password = password
         self.if_rogue = if_rogue
         self.group = group
+        self.server = server
 
     def run(self):  # 换号主函数
         global is_running, adb_path, tapdelay, sim_name, adb_port, pre_input, path
@@ -196,6 +219,7 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         password = self.password
         if_rogue = self.if_rogue
         group = self.group
+        server = self.server
         # 终止adb
         # print("尝试终止adb ...")
         # logger.info("[Child Thread]Killing adb...")  # 似乎不终止adb更好?
@@ -209,7 +233,7 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         # 终止MAA
         print("尝试终止MAA ...")
         logger.info("[Child Thread]Killing MAA...")
-        popen = os.popen('wmic process where name="maa.exe" call terminate 2>&1').read()
+        popen = os.popen('taskkill /f /im maa.exe').read()
         logger.info(popen)
         try:
             asst.stop()
@@ -221,7 +245,7 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         t = tapdelay
         i = None
         logger.info("[Child Thread]Connecting simulator...")
-        print("正在接模拟器")
+        # print("正在接模拟器")
         popen = os.popen(''.join([adb_path + ' devices'])).read()  # 有几率出问题？？？
         logger.debug(popen)
         subprocess.run(''.join([adb_path + ' connect ' + adb_port]), shell=True)
@@ -229,14 +253,12 @@ class TimerThread(QThread):  # 多线程，用于账号切换
             subprocess.run(''.join([pre_input + 'input su']), shell=True)
         print("成功连接至", dialog.sim_name.currentText())
         logger.info("[Child Thread]Successfully connect to simulator.")
-        time.sleep(2)
         logger.info("[Child Thread]Killing 自动精灵...")
         try:
             subprocess.run(''.join([pre_input, 'am force-stop com.zdanjian.zdanjian']),
                            shell=True)  # 关闭自动精灵(你可以用自动精灵，不会出事)
         except Exception as e:
             logger.error(f"[Child Thread]Failed to kill 自动精灵：{e}")
-        time.sleep(2)
         size = os.popen(pre_input + 'wm size').read()
         size = size[size.find(":") + 2:]
         if sim_name == 'mumu' or sim_name == 'mumu12':
@@ -252,62 +274,67 @@ class TimerThread(QThread):  # 多线程，用于账号切换
         with open("./recognition_dataset/recg.json", "r") as f:
             data = json.load(f)
             f.close()
-        while True:
-            logger.info("[Child Thread]Executing image recognition...")
-            img = dialog.capture_screen()
-            found_match = False  # 用于跟踪是否已经有一次判断成立
-            begin_login = False  # 用于跟踪是否开始登录
-            for images in data:
-                if img is None:
+        if server:
+            logger.info("[Child Thread]Starting bili Arknights...")
+            run_command(
+                pre_input + 'monkey -p com.hypergryph.arknights.bilibili -c android.intent.category.LAUNCHER 1')
+        else:
+            while True:
+                logger.info("[Child Thread]Executing image recognition...")
+                img = dialog.capture_screen()
+                found_match = False  # 用于跟踪是否已经有一次判断成立
+                begin_login = False  # 用于跟踪是否开始登录
+                for images in data:
+                    if img is None:
+                        break
+                    template = cv2.imread('./recognition_dataset/' + images["image"])
+                    # template = cv2.resize(template, (size_x, size_y))
+                    result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
+                    if result.max() > float(images["threshold"]):
+                        logger.info("[Child Thread]In threshold: " + images["threshold"])
+                        logger.info("[Child Thread]" + images["image"] + " matched")
+                        found_match = True
+                        taps = images["taps"].split(";")  # 点击的坐标使用分号分隔开
+                        for point in taps:
+                            if point == "exit":  # 坐标支持特殊项：exit，作用为结束识图步骤，开始输入账号密码
+                                begin_login = True
+                            elif point == "open_game":
+                                logger.info("[Child Thread]Starting Arknights...")
+                                run_command(
+                                    pre_input + 'monkey -p com.hypergryph.arknights -c android.intent.category.LAUNCHER 1')
+                                # 打开!方舟
+                            else:
+                                tap_point(pre_input, int(point.split(",")[0]), int(point.split(",")[1]),
+                                          size_x, size_y)
+                                time.sleep(t)
+                        break
+                    # else:
+                    #     logger.info("In threshold: " + images["threshold"])
+                    #     logger.info(images["image"] + " Not matched")
+                if not found_match:
+                    # 没找到就返回
+                    tap_point(pre_input, 1, 5, size_x, size_y)  # 1！5！
+                    run_command(pre_input + 'input keyevent BACK')  # 返回
+                    logger.info("[Child Thread]No match found")
+                    logger.info("[Child Thread]Adb execute back.")
+                    time.sleep(t)
+                if begin_login:
+                    logger.info("[Child Thread]Start to input account and password.")
                     break
-                template = cv2.imread('./recognition_dataset/' + images["image"])
-                # template = cv2.resize(template, (size_x, size_y))
-                result = cv2.matchTemplate(img, template, cv2.TM_CCOEFF_NORMED)
-                if result.max() > float(images["threshold"]):
-                    logger.info("[Child Thread]In threshold: " + images["threshold"])
-                    logger.info("[Child Thread]" + images["image"] + " matched")
-                    found_match = True
-                    taps = images["taps"].split(";")  # 点击的坐标使用分号分隔开
-                    for point in taps:
-                        if point == "exit":  # 坐标支持特殊项：exit，作用为结束识图步骤，开始输入账号密码
-                            begin_login = True
-                        elif point == "open_game":
-                            logger.info("[Child Thread]Starting Arknights...")
-                            run_command(
-                                pre_input + 'monkey -p com.hypergryph.arknights -c android.intent.category.LAUNCHER 1')
-                            # 打开!方舟
-                        else:
-                            tap_point(pre_input, int(point.split(",")[0]), int(point.split(",")[1]),
-                                      size_x, size_y)
-                            time.sleep(t)
-                    break
-                # else:
-                #     logger.info("In threshold: " + images["threshold"])
-                #     logger.info(images["image"] + " Not matched")
-            if not found_match:
-                # 没找到就返回
-                tap_point(pre_input, 1, 5, size_x, size_y)  # 1！5！
-                run_command(pre_input + 'input keyevent BACK')  # 返回
-                logger.info("[Child Thread]No match found")
-                logger.info("[Child Thread]Adb execute back.")
-                time.sleep(t)
-            if begin_login:
-                logger.info("[Child Thread]Start to input account and password.")
-                break
-        tap_point(pre_input, 900, 415, size_x, size_y)  # 输入账号
-        time.sleep(t)
-        run_command(pre_input + 'input text ' + account)
-        time.sleep(t)
-        tap_point(pre_input, 900, 540, size_x, size_y)  # 输入密码
-        time.sleep(t)
-        run_command(pre_input + 'input text ' + password)
-        time.sleep(t)
-        tap_point(pre_input, 705, 620, size_x, size_y)
-        time.sleep(t)
-        tap_point(pre_input, 960, 750, size_x, size_y)
-        time.sleep(t)
-        logger.info("[Child Thread]Disconnecting adb...")
-        run_command(adb_path + ' disconnect')
+            tap_point(pre_input, 900, 415, size_x, size_y)  # 输入账号
+            time.sleep(t)
+            run_command(pre_input + 'input text ' + account)
+            time.sleep(t)
+            tap_point(pre_input, 900, 540, size_x, size_y)  # 输入密码
+            time.sleep(t)
+            run_command(pre_input + 'input text ' + password)
+            time.sleep(t)
+            tap_point(pre_input, 705, 620, size_x, size_y)
+            time.sleep(t)
+            tap_point(pre_input, 960, 750, size_x, size_y)
+            time.sleep(t)
+            logger.info("[Child Thread]Disconnecting adb...")
+            run_command(adb_path + ' disconnect')
 
         # logger.info("[Child Thread]Shutting down RuntimeBroker.exe...")
         # run_command('taskkill /pid RuntimeBroker.exe /f') # 这个应该不需要了
@@ -461,7 +488,7 @@ class InputDialog(QDialog):
         # if result.max() > 0.8:
         #     return '位于开始页'
 
-    # noinspection PyUnresolvedReferences
+    # 界面
     def __init__(self):
         global app_name, adb_path, pwd
 
@@ -669,8 +696,9 @@ class InputDialog(QDialog):
         switch.setOffText("账号已关闭！")
         switch.clicked.connect(self.switch_btn_command)
         switch.setChecked(1)
+        server = QCheckBox(self)
 
-        input_group = (account_edit, password_edit, time_edit, if_rogue, rogue_name, switch)  # 将一组输入框打包为一个元组
+        input_group = (account_edit, password_edit, time_edit, if_rogue, rogue_name, switch, server)  # 将一组输入框打包为一个元组
         self.inputs.append(input_group)
         self.save_info()  # 保存info.txt文件中的数据
 
@@ -688,6 +716,7 @@ class InputDialog(QDialog):
                     rogue = bool(group["if_rogue"])
                     rogue_number = group["rogue_name"]  # 0为萨米，1为水月，2为愧影, 3为萨卡兹
                     account_switch = group["switch"]
+                    set_server = bool(group["Server"])  # 服务器，0官1b
                     account_edit = QLineEdit(self)
                     account_edit.setText(account)
                     password_edit = QLineEdit(self)
@@ -704,6 +733,9 @@ class InputDialog(QDialog):
                     rogue_name = QComboBox(self)
                     rogue_name.addItems(rogue_list)
                     rogue_name.setCurrentIndex(rogue_number)
+                    server.setChecked(set_server)
+                    server.setText('勾上代表是B服')
+                    server.clicked.connect(self.switch_btn_command)
                     switch = SwitchBtn()
                     switch.setOnText("账号已开启！")
                     switch.setOffText("账号已关闭！")
@@ -712,6 +744,7 @@ class InputDialog(QDialog):
 
                     account_label = f"第{group_count}组账号密码:"  # 创建账号标签
                     time_lable = "执行时间:"
+                    server_label = "是B服就勾上："
                     account_edit = input_group[0]  # 获取信息
                     password_edit = input_group[1]
                     time_edit = input_group[2]
@@ -719,6 +752,7 @@ class InputDialog(QDialog):
                     self.form.addRow(account_edit, password_edit)
                     self.form.addRow(time_lable, time_edit)
                     self.form.addRow(if_rogue, rogue_name)
+                    self.form.addRow(server_label, server)
 
         self.form.addRow(self.start_btn, self.add_button)
         self.form.addRow(self.stop_btn, self.del_button)
@@ -767,6 +801,7 @@ class InputDialog(QDialog):
                 rogue = bool(group["if_rogue"])
                 rogue_number = group["rogue_name"]  # 0为萨米，1为水月，2为愧影, 3为萨卡兹, 3为萨卡兹
                 account_switch = group["switch"]
+                set_server = bool(group["Server"])  # 服务器，0官1b
                 account_edit = QLineEdit(self)
                 account_edit.setText(account)
                 password_edit = QLineEdit(self)
@@ -783,6 +818,10 @@ class InputDialog(QDialog):
                 rogue_name = QComboBox(self)
                 rogue_name.addItems(rogue_list)
                 rogue_name.setCurrentIndex(rogue_number)
+                server = QCheckBox(self)
+                server.setChecked(set_server)
+                server.setText('勾上代表是B服')
+                server.clicked.connect(self.switch_btn_command)
                 switch = SwitchBtn()
                 switch.setOnText("账号已开启！")
                 switch.setOffText("账号已关闭！")
@@ -790,7 +829,7 @@ class InputDialog(QDialog):
                 switch.setChecked(account_switch)
 
                 input_group = (
-                    account_edit, password_edit, time_edit, if_rogue, rogue_name, switch)  # 将一组输入框打包为一个元组
+                    account_edit, password_edit, time_edit, if_rogue, rogue_name, switch, server)  # 将一组输入框打包为一个元组
                 self.inputs.append(input_group)  # 将一组输入框添加到列表中
                 group_count += 1
 
@@ -833,14 +872,16 @@ class InputDialog(QDialog):
             if_rogue = input_group[3]
             rogue_name = input_group[4]
             switch = input_group[5]
+            server = input_group[6]
             account = account_edit.text()
             password = password_edit.text()
             time = time_edit.text()
             if_rogue = if_rogue.isChecked()
             rogue_name = rogue_name.currentIndex()
             account_switch = switch.isChecked()
+            set_server = server.isChecked()
             group_data = {"group": group_count, "account": account, "password": password, "time": time,
-                          "if_rogue": if_rogue, "rogue_name": rogue_name, "switch": account_switch}  # 将一组数据打包为一个字典对象
+                          "if_rogue": if_rogue, "rogue_name": rogue_name, "switch": account_switch, "Server": set_server}  # 将一组数据打包为一个字典对象
             group_data = {f"account{group_count}": group_data}
             data.update(group_data)  # 将一组数据添加到列表中
         tapdelay = self.tapdelay.text()
@@ -856,16 +897,19 @@ class InputDialog(QDialog):
             group = i + 1  # 计算当前输入框的组数
             account_label = f"第{group}组账号密码:"
             time_lable = "执行时间:"
+            server_label = "是B服就勾上："
             account_edit = input_group[0]
             password_edit = input_group[1]
             time_edit = input_group[2]
             if_rogue = input_group[3]
             rogue_name = input_group[4]
             switch = input_group[5]
+            server = input_group[6]
             self.form.addRow(account_label, switch)
             self.form.addRow(account_edit, password_edit)
             self.form.addRow(time_lable, time_edit)
             self.form.addRow(if_rogue, rogue_name)
+            self.form.addRow(server_label, server)
         self.form.addRow(self.start_btn, self.add_button)
         self.form.addRow(self.stop_btn, self.del_button)
         self.form.addRow(self.change_btn, self.rogue_btn)
@@ -890,9 +934,10 @@ class InputDialog(QDialog):
             account = group["account"]
             password = group["password"]
             account_switch = group["switch"]
+            server = group["Server"]
             if account_switch:
                 i += 1
-                times[i] = [account, password, False, group["group"]]
+                times[i] = [account, password, False, group["group"], server]
 
         logger.info(f"Start on account:{times}")
         self.save_info()
@@ -911,7 +956,7 @@ class InputDialog(QDialog):
                 f.close()
             for i in times:
                 if judge == 'Stop' and do_count == i - 1:
-                    timer_thread = TimerThread(times[i][0], times[i][1], times[i][2], times[i][3])
+                    timer_thread = TimerThread(times[i][0], times[i][1], times[i][2], times[i][3], times[i][4])
                     if is_running is False:
                         do_count += 1
                         timer_thread.start()
@@ -942,6 +987,7 @@ class InputDialog(QDialog):
             rogue = group["if_rogue"]
             rogue_name = group["rogue_name"]  # 0为萨米，1为水月，2为愧影, 3为萨卡兹
             account_switch = group["switch"]
+            server = group["Server"]
             if account_switch:
                 if minitime == None or datetime.strptime(minitime, "%H:%M") > datetime.strptime(time, "%H:%M"):  #
                     # 只有开启的账号才会进行唤醒
@@ -954,11 +1000,12 @@ class InputDialog(QDialog):
                     rogue_name = "Phantom"
                 elif rogue_name == 3:
                     rogue_name = "Sarkaz"
-                times[time] = [account, password, rogue, rogue_name, i]
+                times[time] = [account, password, rogue, rogue_name, server, i]
                 print(f'第{i}组账号：', account, '\n'
-                                                '执行时间：', time, '\n'
-                                                                   '是否肉鸽：', rogue, '\n'
-                                                                                       '打哪个（如果打）：', rogue_name)
+                        '执行时间：', time, '\n'
+                        '是否肉鸽：', rogue, '\n'
+                        '打哪个（如果打）：', rogue_name, '\n'
+                        '什么服务器：', server)
         minitime2 = datetime.strptime(minitime, "%H:%M") + timedelta(hours=12)
         minitime2 = minitime2.strftime("%H:%M")
         set_win_task(minitime, 'WakeUp', pwd)
@@ -1073,7 +1120,7 @@ class InputDialog(QDialog):
                 rogue_name = times.get(m)[3]
                 if is_running is False:
                     self.account_timer_thread = TimerThread(
-                        times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[4]
+                        times.get(m)[0], times.get(m)[1], times.get(m)[2], times.get(m)[5], times.get(m)[4]
                     )
                     self.account_timer_thread.timer_signal.connect(self.update_output)  # 把子线程定义过去
                     self.account_timer_thread.signal_start_rogue.connect(self.start_rogue_timer)
@@ -1182,18 +1229,21 @@ if __name__ == '__main__':
 
     asst_path = str(pathlib.Path(__file__).parent)
 
-    '''初始化MAA'''
-    path = pathlib.Path(__file__).parent.parent
+    path = pathlib.Path(__file__).resolve().parent.parent
     while os.path.isfile(''.join([str(path), "/MaaCore.dll"])) is False:
         path = pathlib.Path(path).parent
         time.sleep(1)
         if len(str(path)) == 3:
             logger.error("Loading MAA failed, exiting...")
             os._exit(0)
+    '''
     logger.info(f"Loading MAA path at {str(path)}")
+
+    Updater(path, Version.Stable).update()
     Asst.load(path=path)
-    asst = Asst()
+    asst = Asst(callback=my_callback)
     logger.info(f"Loading MAA succeed!")
+    '''
 
     logger.info("Qt initialization success.")
     app = QApplication(sys.argv)
